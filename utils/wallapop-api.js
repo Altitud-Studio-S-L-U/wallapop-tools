@@ -54,10 +54,11 @@ const WallapopAPI = (() => {
     const signature = await generateSignature(url, method, timestamp);
 
     const hostname = options.hostname || 'es.wallapop.com';
+    const isWrite = method === 'PUT' || method === 'POST' || method === 'DELETE';
     const headers = {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json',
-      'Accept': 'application/json, text/plain, */*',
+      'Accept': isWrite ? 'application/vnd.upload-v2+json' : 'application/json, text/plain, */*',
       'X-Signature': signature,
       'Timestamp': timestamp,
       'X-DeviceOS': '0',
@@ -243,11 +244,20 @@ const WallapopAPI = (() => {
     const item = await getItemDetails(token, deviceId, itemId, hostname);
     const body = mapGetToPutBody(item, newPrice);
 
-    return apiCall(`/api/v3/items/${itemId}`, token, deviceId, {
-      method: 'PUT',
-      body: JSON.stringify(body),
-      ...opts,
-    });
+    console.log('[WallapopAPI] PUT /api/v3/items/' + itemId);
+    console.log('[WallapopAPI] GET item response:', JSON.stringify(item).slice(0, 500));
+    console.log('[WallapopAPI] PUT body:', JSON.stringify(body));
+
+    try {
+      return await apiCall(`/api/v3/items/${itemId}`, token, deviceId, {
+        method: 'PUT',
+        body: JSON.stringify(body),
+        ...opts,
+      });
+    } catch (err) {
+      console.error('[WallapopAPI] PUT failed:', err.message);
+      throw err;
+    }
   }
 
   // --- CSV Export ---

@@ -38,6 +38,36 @@ async function getSession() {
 
 async function setSession(fields) {
   await chrome.storage.session.set(fields);
+  if (fields.hostname) {
+    await updateOriginRules(fields.hostname);
+  }
+}
+
+// Rewrite Origin + Referer so Wallapop's API accepts PUT/POST from the extension
+async function updateOriginRules(hostname) {
+  const origin = `https://${hostname}`;
+  try {
+    await chrome.declarativeNetRequest.updateDynamicRules({
+      removeRuleIds: [1],
+      addRules: [{
+        id: 1,
+        priority: 1,
+        action: {
+          type: 'modifyHeaders',
+          requestHeaders: [
+            { header: 'Origin', operation: 'set', value: origin },
+            { header: 'Referer', operation: 'set', value: origin + '/' },
+          ],
+        },
+        condition: {
+          urlFilter: 'https://api.wallapop.com/*',
+          resourceTypes: ['xmlhttprequest', 'other'],
+        },
+      }],
+    });
+  } catch (err) {
+    console.error('[WallapopTools] Failed to set Origin rules:', err);
+  }
 }
 
 async function ensureUserId() {
@@ -657,4 +687,15 @@ chrome.runtime.onInstalled.addListener((details) => {
       item_tracking: {},
     });
   }
+  // Initialize Origin rules on install/update
+  chrome.storage.session.get(['hostname']).then((data) => {
+    if (data.hostname) updateOriginRules(data.hostname);
+    else updateOriginRules(_hostname);
+  });
+});
+
+// Also initialize on service worker startup (wake from idle)
+chrome.storage.session.get(['hostname']).then((data) => {
+  const host = data.hostname || _hostname;
+  updateOriginRules(host);
 });

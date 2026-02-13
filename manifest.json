@@ -4,7 +4,7 @@
   "version": "5.0.0",
   "description": "__MSG_extDescription__",
   "default_locale": "es",
-  "permissions": ["storage", "alarms", "notifications"],
+  "permissions": ["storage", "alarms", "notifications", "declarativeNetRequest"],
   "host_permissions": [
     "https://api.wallapop.com/*",
     "https://es.wallapop.com/*",
