@@ -199,7 +199,7 @@ async function republishAll(sendProgress) {
       }
 
       try {
-        await WallapopAPI.republishItem(session.token, session.deviceId, items[i].id);
+        await WallapopAPI.republishItem(session.token, session.deviceId, items[i].id, session.hostname);
         success++;
       } catch (err) {
         if (err.message === 'TOKEN_EXPIRED') {
@@ -245,7 +245,7 @@ async function republishSelected(itemIds, sendProgress) {
       }
 
       try {
-        await WallapopAPI.republishItem(session.token, session.deviceId, validIds[i]);
+        await WallapopAPI.republishItem(session.token, session.deviceId, validIds[i], session.hostname);
         success++;
       } catch (err) {
         if (err.message === 'TOKEN_EXPIRED') {
@@ -307,7 +307,7 @@ async function adjustAllPrices(percentChange, sendProgress, itemIds) {
       }
 
       try {
-        await WallapopAPI.updateItemPrice(session.token, session.deviceId, item.id, newPrice);
+        await WallapopAPI.updateItemPrice(session.token, session.deviceId, item.id, newPrice, session.hostname);
         success++;
       } catch (err) {
         if (err.message === 'TOKEN_EXPIRED') {
@@ -335,7 +335,7 @@ async function adjustAllPrices(percentChange, sendProgress, itemIds) {
 async function updateSingleItemPrice(itemId, newPrice) {
   const session = await ensureUserId();
   const id = validateItemId(itemId);
-  await WallapopAPI.updateItemPrice(session.token, session.deviceId, id, newPrice);
+  await WallapopAPI.updateItemPrice(session.token, session.deviceId, id, newPrice, session.hostname);
   await logActivity({ type: 'price_exact', itemId: id, newPrice });
   await updatePriceStats(1, 0);
   return { success: true, itemId: id, newPrice };

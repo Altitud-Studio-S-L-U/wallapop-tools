@@ -243,4 +243,335 @@ describe('WallapopAPI', () => {
       expect(headers['Origin']).toBe('https://es.wallapop.com');
     });
   });
+
+  // ============================================================
+  // extractItems
+  // ============================================================
+
+  describe('extractItems', () => {
+    it('should extract from data.section.payload.items', () => {
+      const resp = { data: { section: { payload: { items: [{ id: '1' }] } } } };
+      expect(WallapopAPI.extractItems(resp)).toEqual([{ id: '1' }]);
+    });
+
+    it('should extract from data.items', () => {
+      const resp = { data: { items: [{ id: '2' }] } };
+      expect(WallapopAPI.extractItems(resp)).toEqual([{ id: '2' }]);
+    });
+
+    it('should extract from items', () => {
+      const resp = { items: [{ id: '3' }] };
+      expect(WallapopAPI.extractItems(resp)).toEqual([{ id: '3' }]);
+    });
+
+    it('should extract from data array', () => {
+      const resp = { data: [{ id: '4' }] };
+      expect(WallapopAPI.extractItems(resp)).toEqual([{ id: '4' }]);
+    });
+
+    it('should return empty array for null/undefined', () => {
+      expect(WallapopAPI.extractItems(null)).toEqual([]);
+      expect(WallapopAPI.extractItems(undefined)).toEqual([]);
+      expect(WallapopAPI.extractItems({})).toEqual([]);
+    });
+
+    it('should prefer deeper paths over shallower ones', () => {
+      const resp = {
+        data: { section: { payload: { items: [{ id: 'deep' }] } }, items: [{ id: 'shallow' }] },
+        items: [{ id: 'top' }],
+      };
+      expect(WallapopAPI.extractItems(resp)[0].id).toBe('deep');
+    });
+
+    it('should skip empty arrays and try next path', () => {
+      const resp = { data: { section: { payload: { items: [] } }, items: [{ id: 'fallback' }] } };
+      expect(WallapopAPI.extractItems(resp)[0].id).toBe('fallback');
+    });
+  });
+
+  // ============================================================
+  // mapGetToPutBody
+  // ============================================================
+
+  describe('mapGetToPutBody', () => {
+    it('should map a typical item correctly', () => {
+      const item = {
+        title: { original: 'iPhone 15' },
+        description: { original: 'Great phone' },
+        type_attributes: { condition: { value: 'as_good_as_new' } },
+        taxonomy: [{ id: 100 }, { id: 200 }],
+        shipping: { user_allows_shipping: true, max_weight_kg: 5, cost_configuration_id: 'abc' },
+        location: { latitude: 41.3, longitude: 2.17 },
+        images: [{ id: 'img1' }, { id: 'img2' }],
+      };
+      const body = WallapopAPI.mapGetToPutBody(item, 899);
+      expect(body.attributes.title).toBe('iPhone 15');
+      expect(body.attributes.description).toBe('Great phone');
+      expect(body.attributes.price_amount).toBe(899);
+      expect(body.attributes.condition).toBe('as_good_as_new');
+      expect(body.category_leaf_id).toBe('200');
+      expect(body.delivery.allowed_by_user).toBe(true);
+      expect(body.delivery.max_weight_kg).toBe(5);
+      expect(body.delivery.cost_configuration_id).toBe('abc');
+      expect(body.location.latitude).toBe(41.3);
+      expect(body.pictures).toEqual([{ id: 'img1', order: 0 }, { id: 'img2', order: 1 }]);
+    });
+
+    it('should set max_weight_kg to null when delivery disabled', () => {
+      const item = {
+        title: { original: 'Shirt' },
+        description: { original: '' },
+        shipping: { user_allows_shipping: false },
+        images: [],
+      };
+      const body = WallapopAPI.mapGetToPutBody(item, 10);
+      expect(body.delivery.allowed_by_user).toBe(false);
+      expect(body.delivery.max_weight_kg).toBe(null);
+    });
+
+    it('should force category_leaf_id to string', () => {
+      const item = {
+        title: 'Test',
+        taxonomy: [{ id: 42 }],
+        images: [],
+      };
+      const body = WallapopAPI.mapGetToPutBody(item, 5);
+      expect(body.category_leaf_id).toBe('42');
+      expect(typeof body.category_leaf_id).toBe('string');
+    });
+
+    it('should fallback to category_id when no taxonomy', () => {
+      const item = { title: 'Test', category_id: 99, images: [] };
+      const body = WallapopAPI.mapGetToPutBody(item, 5);
+      expect(body.category_leaf_id).toBe('99');
+    });
+
+    it('should handle plain string title and description', () => {
+      const item = { title: 'Plain Title', description: 'Plain Desc', images: [] };
+      const body = WallapopAPI.mapGetToPutBody(item, 10);
+      expect(body.attributes.title).toBe('Plain Title');
+      expect(body.attributes.description).toBe('Plain Desc');
+    });
+
+    it('should use delivery fallback paths', () => {
+      const item = {
+        title: 'Test',
+        delivery: { allowed_by_user: true, cost_configuration_id: 'xyz' },
+        images: [],
+      };
+      const body = WallapopAPI.mapGetToPutBody(item, 10);
+      expect(body.delivery.allowed_by_user).toBe(true);
+      expect(body.delivery.cost_configuration_id).toBe('xyz');
+    });
+
+    it('should handle empty item with safe defaults', () => {
+      const body = WallapopAPI.mapGetToPutBody({}, 1);
+      expect(body.attributes.title).toBe('');
+      expect(body.attributes.description).toBe('');
+      expect(body.attributes.condition).toBe('good');
+      expect(body.category_leaf_id).toBe(null);
+      expect(body.delivery.allowed_by_user).toBe(false);
+      expect(body.delivery.max_weight_kg).toBe(null);
+      expect(body.pictures).toEqual([]);
+    });
+
+    it('should always include cost_configuration_id', () => {
+      const item = { title: 'Test', shipping: { cost_configuration_id: 'always' }, images: [] };
+      const body = WallapopAPI.mapGetToPutBody(item, 10);
+      expect(body.delivery.cost_configuration_id).toBe('always');
+    });
+
+    it('should use pictures as fallback for images', () => {
+      const item = { title: 'Test', pictures: [{ id: 'p1' }, { id: 'p2' }] };
+      const body = WallapopAPI.mapGetToPutBody(item, 10);
+      expect(body.pictures).toEqual([{ id: 'p1', order: 0 }, { id: 'p2', order: 1 }]);
+    });
+  });
+
+  // ============================================================
+  // exportItemsToCSV
+  // ============================================================
+
+  describe('exportItemsToCSV', () => {
+    it('should generate valid CSV header', () => {
+      const csv = WallapopAPI.exportItemsToCSV([]);
+      expect(csv).toBe('title,price,category,condition,days_listed,shipping_enabled,url');
+    });
+
+    it('should include item data in CSV rows', () => {
+      const items = [{
+        title: { original: 'Phone' },
+        price: { cash: { amount: 100 } },
+        taxonomy: [{ name: 'Electronics', id: 1 }],
+        type_attributes: { condition: { value: 'good' } },
+        creation_date: new Date(Date.now() - 86400000 * 5).toISOString(),
+        shipping: { user_allows_shipping: true },
+        web_slug: 'phone-123',
+      }];
+      const csv = WallapopAPI.exportItemsToCSV(items);
+      const lines = csv.split('\n');
+      expect(lines.length).toBe(2);
+      expect(lines[1]).toContain('Phone');
+      expect(lines[1]).toContain('100');
+      expect(lines[1]).toContain('Electronics');
+      expect(lines[1]).toContain('true');
+    });
+
+    it('should escape commas in title', () => {
+      const items = [{ title: 'iPhone 15, 256GB', price: 800, images: [] }];
+      const csv = WallapopAPI.exportItemsToCSV(items);
+      expect(csv).toContain('"iPhone 15, 256GB"');
+    });
+
+    it('should handle empty items gracefully', () => {
+      const items = [{}];
+      const csv = WallapopAPI.exportItemsToCSV(items);
+      expect(csv.split('\n').length).toBe(2);
+    });
+  });
+
+  // ============================================================
+  // searchItemsRaw
+  // ============================================================
+
+  describe('searchItemsRaw', () => {
+    it('should return raw items from search_objects', async () => {
+      globalThis.fetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({
+          search_objects: [
+            { id: '1', title: 'iPhone', price: { cash: { amount: 500 } } },
+            { id: '2', title: 'Samsung', price: { cash: { amount: 300 } } },
+          ],
+        }),
+      });
+
+      const items = await WallapopAPI.searchItemsRaw('phone');
+      expect(items).toHaveLength(2);
+      expect(items[0].id).toBe('1');
+      expect(items[1].id).toBe('2');
+    });
+
+    it('should fallback to items array', async () => {
+      globalThis.fetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({
+          items: [{ id: '3', title: 'Pixel' }],
+        }),
+      });
+
+      const items = await WallapopAPI.searchItemsRaw('pixel');
+      expect(items).toHaveLength(1);
+      expect(items[0].id).toBe('3');
+    });
+
+    it('should return empty array on no results', async () => {
+      globalThis.fetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({}),
+      });
+
+      const items = await WallapopAPI.searchItemsRaw('nonexistent12345');
+      expect(items).toEqual([]);
+    });
+
+    it('should throw on API error', async () => {
+      globalThis.fetch.mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+      });
+
+      await expect(WallapopAPI.searchItemsRaw('test')).rejects.toThrow('Search API error: 500');
+    });
+
+    it('should use public headers without auth', async () => {
+      globalThis.fetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ search_objects: [] }),
+      });
+
+      await WallapopAPI.searchItemsRaw('test');
+
+      const callArgs = globalThis.fetch.mock.calls[0];
+      const headers = callArgs[1].headers;
+      expect(headers['Accept']).toBe('application/json');
+      expect(headers['X-DeviceOS']).toBe('0');
+      expect(headers['Authorization']).toBeUndefined();
+    });
+
+    it('should include category and location params when provided', async () => {
+      globalThis.fetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ search_objects: [] }),
+      });
+
+      await WallapopAPI.searchItemsRaw('laptop', '15000', 41.3, 2.17);
+
+      const url = globalThis.fetch.mock.calls[0][0];
+      expect(url).toContain('category_ids=15000');
+      expect(url).toContain('latitude=41.3');
+      expect(url).toContain('longitude=2.17');
+    });
+  });
+
+  // ============================================================
+  // fetchPublicItemDetails
+  // ============================================================
+
+  describe('fetchPublicItemDetails', () => {
+    it('should return item details on success', async () => {
+      globalThis.fetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ id: 'abc123', title: 'PS5', price: { cash: { amount: 400 } } }),
+      });
+
+      const item = await WallapopAPI.fetchPublicItemDetails('abc123');
+      expect(item).toBeDefined();
+      expect(item.id).toBe('abc123');
+    });
+
+    it('should return null on 404', async () => {
+      globalThis.fetch.mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+      });
+
+      const item = await WallapopAPI.fetchPublicItemDetails('nonexistent');
+      expect(item).toBeNull();
+    });
+
+    it('should return null on network error', async () => {
+      globalThis.fetch.mockRejectedValueOnce(new Error('Network error'));
+
+      const item = await WallapopAPI.fetchPublicItemDetails('abc123');
+      expect(item).toBeNull();
+    });
+
+    it('should use public headers without auth', async () => {
+      globalThis.fetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ id: 'test' }),
+      });
+
+      await WallapopAPI.fetchPublicItemDetails('test123');
+
+      const callArgs = globalThis.fetch.mock.calls[0];
+      const headers = callArgs[1].headers;
+      expect(headers['Accept']).toBe('application/json');
+      expect(headers['X-DeviceOS']).toBe('0');
+      expect(headers['Authorization']).toBeUndefined();
+    });
+
+    it('should call correct endpoint with item ID', async () => {
+      globalThis.fetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ id: 'myitem' }),
+      });
+
+      await WallapopAPI.fetchPublicItemDetails('myitem');
+
+      const url = globalThis.fetch.mock.calls[0][0];
+      expect(url).toContain('/api/v3/items/myitem');
+    });
+  });
 });
