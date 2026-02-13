@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Wallapop Tools - Icon Generator</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            max-width: 700px;
+            margin: 40px auto;
+            padding: 0 20px;
+            background: #f5f5f5;
+            color: #333;
+        }
+        h1 { color: #13b987; }
+        .preview {
+            display: flex;
+            gap: 30px;
+            align-items: flex-end;
+            margin: 30px 0;
+            padding: 30px;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .preview-item {
+            text-align: center;
+        }
+        .preview-item canvas {
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .preview-item p {
+            margin: 8px 0 0;
+            font-size: 13px;
+            color: #666;
+        }
+        button {
+            background: #13b987;
+            color: #fff;
+            border: none;
+            padding: 12px 28px;
+            font-size: 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #0fa876; }
+        .instructions {
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            margin-top: 20px;
+        }
+        .instructions code {
+            background: #eee;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Wallapop Tools - Icon Generator</h1>
+    <p>Preview of the generated icons at each size:</p>
+
+    <div class="preview">
+        <div class="preview-item">
+            <canvas id="canvas16" width="16" height="16"></canvas>
+            <p>16x16</p>
+        </div>
+        <div class="preview-item">
+            <canvas id="canvas48" width="48" height="48"></canvas>
+            <p>48x48</p>
+        </div>
+        <div class="preview-item">
+            <canvas id="canvas128" width="128" height="128"></canvas>
+            <p>128x128</p>
+        </div>
+    </div>
+
+    <div>
+        <button onclick="downloadAll()">Download All Icons</button>
+        <button onclick="downloadIcon(16)">Download 16x16</button>
+        <button onclick="downloadIcon(48)">Download 48x48</button>
+        <button onclick="downloadIcon(128)">Download 128x128</button>
+    </div>
+
+    <div class="instructions">
+        <h3>Instructions</h3>
+        <ol>
+            <li>Open this file in any modern browser (Chrome, Firefox, Safari, Edge).</li>
+            <li>Click <strong>Download All Icons</strong> to save all three PNG files.</li>
+            <li>Move the downloaded files into the <code>icons/</code> folder, replacing the placeholders:
+                <ul>
+                    <li><code>icon16.png</code></li>
+                    <li><code>icon48.png</code></li>
+                    <li><code>icon128.png</code></li>
+                </ul>
+            </li>
+            <li>Reload the extension in <code>chrome://extensions</code>.</li>
+        </ol>
+    </div>
+
+    <script>
+        const SIZES = [16, 48, 128];
+        const BG_COLOR = "#13b987";
+        const TEXT_COLOR = "#ffffff";
+        const CORNER_RATIO = 0.2; // corner radius as fraction of size
+
+        function drawIcon(canvas, size) {
+            const ctx = canvas.getContext("2d");
+            const r = size * CORNER_RATIO;
+
+            // Clear
+            ctx.clearRect(0, 0, size, size);
+
+            // Rounded rectangle background
+            ctx.beginPath();
+            ctx.moveTo(r, 0);
+            ctx.lineTo(size - r, 0);
+            ctx.quadraticCurveTo(size, 0, size, r);
+            ctx.lineTo(size, size - r);
+            ctx.quadraticCurveTo(size, size, size - r, size);
+            ctx.lineTo(r, size);
+            ctx.quadraticCurveTo(0, size, 0, size - r);
+            ctx.lineTo(0, r);
+            ctx.quadraticCurveTo(0, 0, r, 0);
+            ctx.closePath();
+            ctx.fillStyle = BG_COLOR;
+            ctx.fill();
+
+            // "WT" text
+            const fontSize = Math.round(size * 0.52);
+            ctx.fillStyle = TEXT_COLOR;
+            ctx.font = `bold ${fontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif`;
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText("WT", size / 2, size / 2 + size * 0.03);
+        }
+
+        // Draw all previews on load
+        SIZES.forEach(size => {
+            const canvas = document.getElementById("canvas" + size);
+            drawIcon(canvas, size);
+        });
+
+        function downloadIcon(size) {
+            // Create an offscreen canvas at the desired size
+            const canvas = document.createElement("canvas");
+            canvas.width = size;
+            canvas.height = size;
+            drawIcon(canvas, size);
+
+            const link = document.createElement("a");
+            link.download = `icon${size}.png`;
+            link.href = canvas.toDataURL("image/png");
+            link.click();
+        }
+
+        function downloadAll() {
+            SIZES.forEach((size, i) => {
+                // Small delay between downloads so the browser doesn't block them
+                setTimeout(() => downloadIcon(size), i * 300);
+            });
+        }
+    </script>
+</body>
+</html>

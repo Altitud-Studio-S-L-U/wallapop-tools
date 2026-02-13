@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="popup.css">
+  <title>Wallapop Tools</title>
+</head>
+<body>
+  <div class="popup-container">
+    <!-- Header -->
+    <div class="popup-header">
+      <div class="popup-logo">WT</div>
+      <div>
+        <div class="popup-title">Wallapop Tools</div>
+        <div class="popup-subtitle">Automatiza tus ventas</div>
+      </div>
+    </div>
+
+    <!-- Status -->
+    <div class="popup-status" id="popup-status">
+      <div class="status-dot" id="status-dot"></div>
+      <span id="status-text">Verificando conexion...</span>
+    </div>
+
+    <!-- Stats -->
+    <div class="popup-stats" id="popup-stats">
+      <div class="stat-card">
+        <div class="stat-value" id="stat-items">-</div>
+        <div class="stat-label">Productos</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="stat-last-republish">-</div>
+        <div class="stat-label">Ultimo republish</div>
+      </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="popup-section">
+      <div class="section-title">Acciones rapidas</div>
+      <button class="popup-btn popup-btn-primary" id="btn-republish">
+        Republicar todo
+      </button>
+      <div class="popup-btn-row">
+        <button class="popup-btn popup-btn-secondary" id="btn-lower">
+          Bajar -5%
+        </button>
+        <button class="popup-btn popup-btn-secondary" id="btn-raise">
+          Subir +5%
+        </button>
+      </div>
+    </div>
+
+    <!-- Auto-republish -->
+    <div class="popup-section">
+      <div class="section-title">Auto-republicar</div>
+      <div class="auto-republish-row">
+        <label class="toggle-label">
+          <input type="checkbox" id="auto-republish-toggle">
+          <span class="toggle-slider"></span>
+        </label>
+        <span class="auto-republish-text">Cada</span>
+        <select id="auto-republish-interval" class="popup-select">
+          <option value="6">6h</option>
+          <option value="12" selected>12h</option>
+          <option value="24">24h</option>
+          <option value="48">48h</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="popup-footer">
+      <span>Wallapop Tools v1.0</span>
+      <a href="#" id="btn-settings">Ajustes</a>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

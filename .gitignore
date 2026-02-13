@@ -1,8 +1,7 @@
-# Nestjs specific
+# Dependencies
+node_modules/
 /dist
-/node_modules
 /build
-/tmp
 
 # Logs
 logs
@@ -13,12 +12,21 @@ yarn-debug.log*
 yarn-error.log*
 lerna-debug.log*
 
-# dotenv environment variable files
+# Environment
 .env
 .env.development
 .env.test
 .env.production
 
-# temp directory
+# Temp
 .temp
 .tmp
+/tmp
+
+# OS
+.DS_Store
+
+# Chrome extension build artifacts
+*.zip
+*.crx
+*.pem
