@@ -1,198 +1,184 @@
 # Wallapop Tools
 
-Extensión de Chrome para automatizar y optimizar tus ventas en Wallapop. Republica todos tus anuncios con un click, ajusta precios en lote y programa republicaciones automáticas.
+> Free browser extension for Wallapop sellers — bulk republish, batch pricing, auto-scheduling and CSV export.
 
-**Zero backend.** Todo corre en tu navegador usando tu propia sesión de Wallapop. No se envían datos a servidores externos.
+**Zero backend. Zero tracking. Everything runs locally in your browser.**
 
-## Funcionalidades
+<p align="center">
+  <img src="icons/icon128.png" alt="Wallapop Tools" width="128" />
+</p>
 
-- **Republicar todo** — Refresca todos tus anuncios para que vuelvan a aparecer arriba en el feed
-- **Ajuste masivo de precios** — Sube o baja el precio de todos tus productos un porcentaje con un click
-- **Republicación automática** — Programa republicaciones cada 6, 12, 24 o 48 horas
-- **Dashboard de productos** — Consulta todos tus anuncios, precios y estado desde el toolbar
-- **Toolbar flotante** — Controles rápidos directamente en la página de Wallapop
+## Features
 
-## Cómo funciona
+| Feature | Description |
+|---|---|
+| **One-click republish** | Bump all your listings to the top of the feed instantly |
+| **Batch price adjustment** | Raise or lower prices across all products by a percentage |
+| **Selective actions** | Pick specific items to republish or reprice |
+| **Auto-republish** | Schedule automatic republishing every 6, 12, 24 or 48 hours |
+| **CSV export** | Download your full product list for analysis or backup |
+| **Activity log** | Local history of every action performed |
+| **Multilingual** | Spanish, English, French, Italian and Portuguese |
+
+## Privacy
+
+This extension takes privacy seriously:
+
+- **No servers** — communicates exclusively with Wallapop's official API (`api.wallapop.com`)
+- **No analytics** — zero telemetry, crash reporting or tracking of any kind
+- **No data sharing** — your data never leaves your browser
+- **Session-only tokens** — authentication tokens are cleared when you close the browser
+- **Open source** — audit the code yourself
+
+Full privacy policy: [altitudstudio.ad/en/wallapop-tools/privacy](https://altitudstudio.ad/en/wallapop-tools/privacy)
+
+## Installation
+
+### 1. Download
+
+Download the [latest release](https://github.com/Altitud-Studio-S-L-U/wallapop-tools/releases/latest) (ZIP file).
+
+### 2. Extract
+
+Unzip the file into a folder on your computer.
+
+### 3. Load in Chrome
+
+1. Open `chrome://extensions/`
+2. Enable **Developer mode** (top-right toggle)
+3. Click **Load unpacked**
+4. Select the extracted folder
+
+### 4. Connect
+
+1. Navigate to [wallapop.com](https://es.wallapop.com)
+2. Browse the site while signed in — the extension captures your session token automatically
+3. Click the extension icon to open the popup and manage your listings
+
+## How It Works
 
 ```
-1. Abres es.wallapop.com (con tu sesión iniciada)
-2. La extensión se inyecta automáticamente en la página
-3. Intercepta el token de autenticación de tu sesión activa
-4. Usa ese token para realizar las mismas llamadas API que hace Wallapop
-5. Todo corre en local — sin servidores, sin enviar datos a terceros
+wallapop.com (your active session)
+       │
+       ▼
+┌─────────────────────────────────────────────┐
+│  Content Scripts                            │
+│  interceptor.js → captures auth token       │
+│  bridge.js → relays token to background     │
+└──────────────────┬──────────────────────────┘
+                   │
+                   ▼
+┌─────────────────────────────────────────────┐
+│  Service Worker (background)                │
+│  Orchestrates all operations, scheduling,   │
+│  badge updates and alarm management         │
+└──────────────────┬──────────────────────────┘
+                   │
+                   ▼
+┌─────────────────────────────────────────────┐
+│  wallapop-api.js                            │
+│  HMAC-SHA256 signed API calls               │
+│  GET items, PUT reactivate, PUT price, etc. │
+└──────────────────┬──────────────────────────┘
+                   │  Bearer token (your session)
+                   ▼
+            api.wallapop.com
 ```
 
-## Instalación (desarrollo)
+The extension intercepts the same authentication headers that the Wallapop web app uses, then replicates the exact same API calls. No credentials are stored beyond the browser session.
 
-### 1. Clona el repositorio
-
-```bash
-git clone git@github.com:Altitud-Studio-S-L-U/wallapop-tools.git
-cd wallapop-tools
-```
-
-### 2. Genera los iconos
-
-Abre `scripts/generate-icons.html` en Chrome, haz click en **"Download All Icons"** y mueve los 3 PNGs descargados a la carpeta `icons/`, reemplazando los placeholders.
-
-### 3. Carga la extensión en Chrome
-
-1. Abre `chrome://extensions/`
-2. Activa **Modo desarrollador** (esquina superior derecha)
-3. Click en **"Cargar descomprimida"**
-4. Selecciona la carpeta `wallapop-tools`
-
-### 4. Usa la extensión
-
-1. Ve a [es.wallapop.com](https://es.wallapop.com)
-2. Navega por la web para que la extensión capture tu token de sesión
-3. El toolbar flotante aparecerá abajo a la derecha con el estado **"Conectado"**
-4. Usa los botones del toolbar o el popup de la extensión para gestionar tus anuncios
-
-## Estructura del proyecto
+## Project Structure
 
 ```
 wallapop-tools/
-├── manifest.json                ← Configuración de la extensión (Manifest V3)
+├── manifest.json              # Extension config (Manifest V3)
 ├── background/
-│   └── service-worker.js        ← Alarmas para republicación programada
+│   └── service-worker.js      # Scheduling, alarms, message handling
 ├── content/
-│   ├── content.js               ← Toolbar flotante + lógica de acciones
-│   └── content.css              ← Estilos del toolbar inyectado
+│   ├── interceptor.js         # Token capture (runs in MAIN world)
+│   └── bridge.js              # Relays tokens to service worker
 ├── popup/
-│   ├── popup.html               ← Interfaz del popup (click en icono)
-│   ├── popup.css                ← Estilos del popup
-│   └── popup.js                 ← Lógica: estadísticas, botones, configuración
+│   ├── popup.html             # Extension popup interface
+│   ├── popup.css              # Popup styles (light/dark mode)
+│   └── popup.js               # UI logic, i18n, user interactions
 ├── utils/
-│   └── wallapop-api.js          ← Interceptor de token + cliente API de Wallapop
-├── icons/
-│   ├── icon16.png               ← Icono 16x16
-│   ├── icon48.png               ← Icono 48x48
-│   └── icon128.png              ← Icono 128x128
+│   ├── wallapop-api.js        # API client with HMAC-SHA256 signing
+│   └── i18n-runtime.js        # Lightweight i18n for content scripts
+├── _locales/
+│   ├── es/messages.json       # Spanish (default)
+│   ├── en/messages.json       # English
+│   ├── fr/messages.json       # French
+│   ├── it/messages.json       # Italian
+│   └── pt_PT/messages.json    # Portuguese
+├── icons/                     # Extension icons (16, 48, 128)
+├── tests/                     # Vitest test suite
 └── scripts/
-    └── generate-icons.html      ← Generador de iconos PNG en el navegador
+    └── generate-icons.js      # Icon generation utility
 ```
 
-## Arquitectura
+## Development
 
-```
-┌───────────────────────────────────────────────────┐
-│                    CHROME                          │
-│                                                    │
-│  ┌──────────────┐    ┌──────────────────────────┐ │
-│  │    Popup      │    │   Content Script          │ │
-│  │   (popup.js)  │◄──►│   (content.js)            │ │
-│  │   Stats, UI   │    │   Toolbar flotante        │ │
-│  └──────┬────────┘    │   Acciones sobre items    │ │
-│         │             └──────────┬────────────────┘ │
-│         │                        │                   │
-│  ┌──────▼────────────────────────▼────────────────┐ │
-│  │          Service Worker (background)            │ │
-│  │          Alarmas, scheduling, badge             │ │
-│  └─────────────────────┬──────────────────────────┘ │
-│                        │                             │
-│  ┌─────────────────────▼──────────────────────────┐ │
-│  │         wallapop-api.js (utils)                 │ │
-│  │   - Intercepta fetch/XHR → captura token        │ │
-│  │   - getMyItems(), republishItem()               │ │
-│  │   - updateItemPrice(), deleteItem()             │ │
-│  └─────────────────────┬──────────────────────────┘ │
-│                        │                             │
-└────────────────────────┼─────────────────────────────┘
-                         │ Bearer token (sesión del usuario)
-                         ▼
-               ┌──────────────────┐
-               │ api.wallapop.com │
-               └──────────────────┘
+### Prerequisites
+
+- Node.js 18+ (only needed for tests and icon generation)
+- Chrome or any Chromium-based browser
+
+### Setup
+
+```bash
+git clone https://github.com/Altitud-Studio-S-L-U/wallapop-tools.git
+cd wallapop-tools
+npm install
 ```
 
-## API y autenticación
+### Run tests
 
-La extensión intercepta las llamadas que hace la propia web de Wallapop para capturar el token de sesión y replicar el mismo patrón de peticiones.
-
-### Mecanismo de autenticación (reverse-engineered)
-
-```
-Authorization: Bearer <token>          ← Interceptado de la sesión activa
-X-Signature: Base64(HMAC-SHA256(KEY, "{METHOD}|{URL}|{TIMESTAMP}|"))
-Timestamp: <unix ms>
-DeviceOS: 0                            ← Web client
-DeviceID: <fingerprint>                ← Interceptado de la sesión activa
+```bash
+npm test
 ```
 
-Fuentes: [wallapop_secret](https://github.com/rmonvfer/wallapop_secret), [wallapop-go](https://github.com/Neufal777/wallapop-go), [wallapopy](https://github.com/toniprada/wallapopy), [uapop](https://github.com/josemamira/uapop)
+### Modify and reload
 
-### Endpoints verificados (lectura)
+1. Edit the source files
+2. Go to `chrome://extensions/`
+3. Click the reload icon on the extension card
+4. Refresh the Wallapop tab
 
-Confirmados por clientes open source que interactúan con la API real:
+### Technical notes
 
-| Acción | Método | Endpoint | Fuente |
-|---|---|---|---|
-| Perfil de usuario | GET | `/api/v3/users/{id}/` | wallapop-go, wallapopy |
-| Productos del usuario | GET | `/api/v3/users/{id}/items` | wallapop-go |
-| Reviews del usuario | GET | `/api/v3/users/{id}/reviews` | wallapopy |
-| Categorías | GET | `/api/v3/categories` | wallapopy |
-| Búsqueda | GET | `/api/v3/general/search` | wallapopy |
-| Perks de pago | GET | `/api/v3/payments/perks/me` | uapop |
+- **Rate limiting**: Bulk operations include random delays (2–5 s) between requests to avoid throttling
+- **Token expiry**: If the token expires, the extension prompts you to browse Wallapop to capture a fresh one
+- **API stability**: Wallapop does not provide a public API — endpoints may change without notice
 
-### Endpoints verificados (escritura)
+## Supported Markets
 
-Descubiertos via Chrome DevTools (Feb 2026):
+The extension works with all Wallapop country domains:
 
-| Acción | Método | Endpoint | Body |
-|---|---|---|---|
-| Reactivar/Republicar | PUT | `/api/v3/items/{id}/reactivate` | vacío |
-| Editar item (precio, etc.) | PUT | `/api/v3/items/{id}` | objeto completo del item |
+- `es.wallapop.com` (Spain)
+- `it.wallapop.com` (Italy)
+- `fr.wallapop.com` (France)
+- `pt.wallapop.com` (Portugal)
 
-El precio va dentro de `attributes.price_amount`. Para editar hay que enviar el objeto completo (GET → modificar → PUT).
+## Contributing
 
-### Endpoints pendientes de verificar
+Contributions are welcome. Please open an issue first to discuss what you would like to change.
 
-| Acción | Método probable | Endpoint probable |
-|---|---|---|
-| Reservar | PUT | `/api/v3/items/{id}/reserve` |
-| Eliminar | DELETE | `/api/v3/items/{id}` |
-
-> Para verificar los pendientes: DevTools (`F12`) → Network → filtra `api.wallapop.com` → realiza la acción manualmente.
-
-## Publicación en Chrome Web Store
-
-1. Registrar cuenta de developer en el [Chrome Web Store Developer Dashboard](https://chrome.google.com/webstore/devconsole) ($5 pago único)
-2. Generar iconos definitivos con `scripts/generate-icons.html`
-3. Enlazar la política de privacidad (ver abajo)
-4. Tomar 3-5 screenshots de la extensión en funcionamiento
-5. Comprimir la carpeta en `.zip` (excluir `.git/` y `scripts/`)
-6. Subir al dashboard, completar descripción y screenshots
-7. Enviar a revisión (1-3 días hábiles)
-
-### Política de privacidad
-
-Para la publicación en el Chrome Web Store se requiere una política de privacidad. Se puede usar la de la empresa o crear una específica para la extensión:
-
-- Web de la empresa: [altitudstudio.ad](https://altitudstudio.ad)
-- Privacidad: [altitudstudio.ad/ca/privacy](https://altitudstudio.ad/ca/privacy)
-
-## Desarrollo
-
-### Modificar y recargar
-
-1. Edita los archivos del proyecto
-2. Ve a `chrome://extensions/`
-3. Pulsa el icono de recarga en la tarjeta de la extensión
-4. Recarga la pestaña de `es.wallapop.com`
-
-### Consideraciones técnicas
-
-- **Rate limiting**: Las acciones masivas incluyen delays aleatorios (2-5s) entre peticiones para evitar bloqueos por parte de Wallapop
-- **Expiración del token**: Si el token caduca, la extensión indica al usuario que navegue por Wallapop para capturar uno nuevo automáticamente
-- **Mantenimiento**: Al no existir una API pública oficial de Wallapop, los endpoints pueden cambiar sin previo aviso. Es necesario monitorizar y actualizar cuando sea necesario
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/my-feature`)
+3. Commit your changes
+4. Push to the branch
+5. Open a Pull Request
 
 ## Disclaimer
 
-Este proyecto no está afiliado, asociado, autorizado ni respaldado por Wallapop. Todos los nombres de productos y marcas son propiedad de sus respectivos titulares. El uso de estos nombres es meramente referencial y no implica ninguna asociación.
+This project is not affiliated with, associated with, authorized by, or endorsed by Wallapop. All product names, logos, and brands are property of their respective owners.
+
+## License
+
+MIT
 
 ---
 
-Desarrollado por [Altitud Studio S.L.U.](https://altitudstudio.ad) — Andorra
+Built by [Altitud Studio SLU](https://altitudstudio.ad) — Andorra
 
-Contacto: [info@altitudstudio.ad](mailto:info@altitudstudio.ad)
+[Website](https://altitudstudio.ad/en/wallapop-tools) · [Privacy Policy](https://altitudstudio.ad/en/wallapop-tools/privacy) · [Contact](mailto:info@altitudstudio.ad)
