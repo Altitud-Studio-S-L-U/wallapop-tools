@@ -106,28 +106,46 @@ wallapop-tools/
                └──────────────────┘
 ```
 
-## Configuración de la API
+## API y autenticación
 
-Los endpoints de `wallapop-api.js` deben verificarse contra la API real de Wallapop. Para descubrir los endpoints correctos:
+La extensión intercepta las llamadas que hace la propia web de Wallapop para capturar el token de sesión y replicar el mismo patrón de peticiones.
+
+### Mecanismo de autenticación (reverse-engineered)
+
+```
+Authorization: Bearer <token>          ← Interceptado de la sesión activa
+X-Signature: Base64(HMAC-SHA256(KEY, "{METHOD}|{URL}|{TIMESTAMP}|"))
+Timestamp: <unix ms>
+DeviceOS: 0                            ← Web client
+DeviceID: <fingerprint>                ← Interceptado de la sesión activa
+```
+
+Fuentes: [wallapop_secret](https://github.com/rmonvfer/wallapop_secret), [wallapop-go](https://github.com/Neufal777/wallapop-go), [wallapopy](https://github.com/toniprada/wallapopy), [uapop](https://github.com/josemamira/uapop)
+
+### Endpoints verificados (lectura)
+
+Confirmados por clientes open source que interactúan con la API real:
+
+| Acción | Método | Endpoint | Fuente |
+|---|---|---|---|
+| Perfil de usuario | GET | `/api/v3/users/{id}/` | wallapop-go, wallapopy |
+| Productos del usuario | GET | `/api/v3/users/{id}/items` | wallapop-go |
+| Reviews del usuario | GET | `/api/v3/users/{id}/reviews` | wallapopy |
+| Categorías | GET | `/api/v3/categories` | wallapopy |
+| Búsqueda | GET | `/api/v3/general/search` | wallapopy |
+| Perks de pago | GET | `/api/v3/payments/perks/me` | uapop |
+
+### Endpoints NO verificados (escritura)
+
+Los endpoints de escritura (republicar, editar precio, reservar, eliminar) **no están documentados en ninguna fuente pública**. Los stubs en `wallapop-api.js` son aproximaciones que deben verificarse manualmente:
 
 1. Abre `es.wallapop.com` con Chrome DevTools (`F12`)
-2. Ve a la pestaña **Network**
-3. Filtra por `api.wallapop.com`
-4. Navega por tu perfil, productos, etc.
-5. Observa las URLs y ajusta los endpoints en `utils/wallapop-api.js`
+2. Ve a la pestaña **Network** → filtra por `api.wallapop.com`
+3. Realiza la acción manualmente (editar precio, reservar, eliminar)
+4. Observa la URL, método y body de la petición
+5. Actualiza los endpoints en `utils/wallapop-api.js`
 
-### Endpoints esperados
-
-| Acción | Método | Endpoint |
-|---|---|---|
-| Mi perfil | GET | `/api/v3/users/me` |
-| Mis productos | GET | `/api/v3/users/{id}/items` |
-| Detalle de producto | GET | `/api/v3/items/{id}` |
-| Actualizar precio | PUT | `/api/v3/items/{id}` |
-| Reservar / Republicar | PUT | `/api/v3/items/{id}/reserve` |
-| Eliminar producto | DELETE | `/api/v3/items/{id}` |
-
-> **Nota:** Estos endpoints son aproximaciones basadas en patrones comunes de la API. Es necesario verificarlos con DevTools y actualizarlos si han cambiado.
+> **Importante:** Hasta que no se descubran los endpoints reales de escritura, las funciones de republicar, editar precio y eliminar mostrarán un warning en consola y probablemente fallarán.
 
 ## Publicación en Chrome Web Store
 
