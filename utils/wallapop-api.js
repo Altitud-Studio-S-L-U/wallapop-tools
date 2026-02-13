@@ -244,10 +244,6 @@ const WallapopAPI = (() => {
     const item = await getItemDetails(token, deviceId, itemId, hostname);
     const body = mapGetToPutBody(item, newPrice);
 
-    console.log('[WallapopAPI] PUT /api/v3/items/' + itemId);
-    console.log('[WallapopAPI] GET item response:', JSON.stringify(item).slice(0, 500));
-    console.log('[WallapopAPI] PUT body:', JSON.stringify(body));
-
     try {
       return await apiCall(`/api/v3/items/${itemId}`, token, deviceId, {
         method: 'PUT',
