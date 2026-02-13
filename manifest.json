@@ -1,16 +1,16 @@
 {
   "manifest_version": 3,
-  "name": "Wallapop Tools - Automatiza tus ventas",
-  "version": "1.0.0",
-  "description": "Republica, gestiona precios y automatiza tu Wallapop. Vende más con menos esfuerzo.",
-  "permissions": [
-    "storage",
-    "alarms",
-    "activeTab"
-  ],
+  "name": "__MSG_extName__",
+  "version": "3.0.0",
+  "description": "__MSG_extDescription__",
+  "default_locale": "es",
+  "permissions": ["storage", "alarms"],
   "host_permissions": [
     "https://api.wallapop.com/*",
-    "https://es.wallapop.com/*"
+    "https://es.wallapop.com/*",
+    "https://it.wallapop.com/*",
+    "https://fr.wallapop.com/*",
+    "https://pt.wallapop.com/*"
   ],
   "background": {
     "service_worker": "background/service-worker.js"
@@ -18,18 +18,51 @@
   "content_scripts": [
     {
       "matches": [
-        "https://es.wallapop.com/*"
+        "https://es.wallapop.com/*",
+        "https://it.wallapop.com/*",
+        "https://fr.wallapop.com/*",
+        "https://pt.wallapop.com/*"
       ],
-      "js": [
-        "utils/wallapop-api.js",
-        "content/content.js"
+      "js": ["content/interceptor.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "https://es.wallapop.com/*",
+        "https://it.wallapop.com/*",
+        "https://fr.wallapop.com/*",
+        "https://pt.wallapop.com/*"
       ],
-      "css": [
-        "content/content.css"
+      "js": ["content/bridge.js"],
+      "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "https://es.wallapop.com/*",
+        "https://it.wallapop.com/*",
+        "https://fr.wallapop.com/*",
+        "https://pt.wallapop.com/*"
       ],
+      "js": ["utils/i18n-runtime.js", "content/toolbar.js"],
+      "css": ["content/toolbar.css"],
       "run_at": "document_idle"
     }
   ],
+  "web_accessible_resources": [
+    {
+      "resources": ["_locales/*/messages.json"],
+      "matches": [
+        "https://es.wallapop.com/*",
+        "https://it.wallapop.com/*",
+        "https://fr.wallapop.com/*",
+        "https://pt.wallapop.com/*"
+      ]
+    }
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'none'"
+  },
   "action": {
     "default_popup": "popup/popup.html",
     "default_icon": {

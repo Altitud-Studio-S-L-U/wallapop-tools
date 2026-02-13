@@ -12,7 +12,7 @@
             background: #f5f5f5;
             color: #333;
         }
-        h1 { color: #13b987; }
+        h1 { color: #6366F1; }
         .preview {
             display: flex;
             gap: 30px;
@@ -36,7 +36,7 @@
             color: #666;
         }
         button {
-            background: #13b987;
+            background: #6366F1;
             color: #fff;
             border: none;
             padding: 12px 28px;
@@ -45,7 +45,7 @@
             cursor: pointer;
             margin: 5px;
         }
-        button:hover { background: #0fa876; }
+        button:hover { background: #4F46E5; }
         .instructions {
             background: #fff;
             padding: 20px;
@@ -63,7 +63,7 @@
 </head>
 <body>
     <h1>Wallapop Tools - Icon Generator</h1>
-    <p>Preview of the generated icons at each size:</p>
+    <p>Preview of the generated icons at each size (rocket in indigo squircle):</p>
 
     <div class="preview">
         <div class="preview-item">
@@ -105,18 +105,13 @@
 
     <script>
         const SIZES = [16, 48, 128];
-        const BG_COLOR = "#13b987";
-        const TEXT_COLOR = "#ffffff";
-        const CORNER_RATIO = 0.2; // corner radius as fraction of size
+        const BG_COLOR = "#6366F1";
+        const ROCKET_COLOR = "#ffffff";
+        const FLAME_COLOR = "#FBBF24";
+        const CORNER_RATIO = 0.22;
 
-        function drawIcon(canvas, size) {
-            const ctx = canvas.getContext("2d");
+        function drawSquircle(ctx, size) {
             const r = size * CORNER_RATIO;
-
-            // Clear
-            ctx.clearRect(0, 0, size, size);
-
-            // Rounded rectangle background
             ctx.beginPath();
             ctx.moveTo(r, 0);
             ctx.lineTo(size - r, 0);
@@ -130,14 +125,146 @@
             ctx.closePath();
             ctx.fillStyle = BG_COLOR;
             ctx.fill();
+        }
 
-            // "WT" text
-            const fontSize = Math.round(size * 0.52);
-            ctx.fillStyle = TEXT_COLOR;
-            ctx.font = `bold ${fontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif`;
-            ctx.textAlign = "center";
-            ctx.textBaseline = "middle";
-            ctx.fillText("WT", size / 2, size / 2 + size * 0.03);
+        function drawRocket16(ctx) {
+            // Ultra-simplified rocket for 16px: just a tilted shape
+            ctx.save();
+            ctx.translate(8, 8);
+            ctx.rotate(-Math.PI / 4); // 45 degrees
+
+            // Body
+            ctx.fillStyle = ROCKET_COLOR;
+            ctx.beginPath();
+            ctx.ellipse(0, -1, 2.2, 4.5, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Nose cone
+            ctx.beginPath();
+            ctx.moveTo(0, -6);
+            ctx.lineTo(-1.5, -3.5);
+            ctx.lineTo(1.5, -3.5);
+            ctx.closePath();
+            ctx.fill();
+
+            // Flame
+            ctx.fillStyle = FLAME_COLOR;
+            ctx.beginPath();
+            ctx.moveTo(-1.2, 3.5);
+            ctx.quadraticCurveTo(0, 6.5, 1.2, 3.5);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.restore();
+        }
+
+        function drawRocket(ctx, size) {
+            const s = size / 128; // scale factor relative to 128px base
+            ctx.save();
+            ctx.translate(size * 0.48, size * 0.52);
+            ctx.rotate(-Math.PI / 4);
+
+            // --- Rocket body ---
+            ctx.fillStyle = ROCKET_COLOR;
+            ctx.beginPath();
+            ctx.ellipse(0, 0, 16 * s, 36 * s, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // --- Nose cone ---
+            ctx.beginPath();
+            ctx.moveTo(0, -42 * s);
+            ctx.bezierCurveTo(-10 * s, -32 * s, -14 * s, -22 * s, -14 * s, -12 * s);
+            ctx.lineTo(14 * s, -12 * s);
+            ctx.bezierCurveTo(14 * s, -22 * s, 10 * s, -32 * s, 0, -42 * s);
+            ctx.closePath();
+            ctx.fill();
+
+            // --- Window (porthole) ---
+            ctx.fillStyle = BG_COLOR;
+            ctx.beginPath();
+            ctx.arc(0, -10 * s, 6 * s, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Window highlight
+            ctx.fillStyle = "rgba(255,255,255,0.3)";
+            ctx.beginPath();
+            ctx.arc(-1.5 * s, -12 * s, 2.5 * s, 0, Math.PI * 2);
+            ctx.fill();
+
+            // --- Fins ---
+            ctx.fillStyle = ROCKET_COLOR;
+
+            // Left fin
+            ctx.beginPath();
+            ctx.moveTo(-14 * s, 18 * s);
+            ctx.quadraticCurveTo(-28 * s, 28 * s, -24 * s, 38 * s);
+            ctx.lineTo(-12 * s, 30 * s);
+            ctx.closePath();
+            ctx.fill();
+
+            // Right fin
+            ctx.beginPath();
+            ctx.moveTo(14 * s, 18 * s);
+            ctx.quadraticCurveTo(28 * s, 28 * s, 24 * s, 38 * s);
+            ctx.lineTo(12 * s, 30 * s);
+            ctx.closePath();
+            ctx.fill();
+
+            // --- Flame / exhaust ---
+            const flameGrad = ctx.createLinearGradient(0, 30 * s, 0, 52 * s);
+            flameGrad.addColorStop(0, FLAME_COLOR);
+            flameGrad.addColorStop(0.6, "#F59E0B");
+            flameGrad.addColorStop(1, "rgba(245,158,11,0)");
+            ctx.fillStyle = flameGrad;
+
+            // Center flame
+            ctx.beginPath();
+            ctx.moveTo(-8 * s, 30 * s);
+            ctx.quadraticCurveTo(0, 55 * s, 8 * s, 30 * s);
+            ctx.closePath();
+            ctx.fill();
+
+            // Outer flame glow
+            ctx.fillStyle = "rgba(251,191,36,0.3)";
+            ctx.beginPath();
+            ctx.moveTo(-12 * s, 28 * s);
+            ctx.quadraticCurveTo(0, 60 * s, 12 * s, 28 * s);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.restore();
+        }
+
+        function drawIcon(canvas, size) {
+            const ctx = canvas.getContext("2d");
+            ctx.clearRect(0, 0, size, size);
+
+            // Background squircle
+            drawSquircle(ctx, size);
+
+            // Clip to squircle to keep rocket inside
+            ctx.save();
+            const r = size * CORNER_RATIO;
+            ctx.beginPath();
+            ctx.moveTo(r, 0);
+            ctx.lineTo(size - r, 0);
+            ctx.quadraticCurveTo(size, 0, size, r);
+            ctx.lineTo(size, size - r);
+            ctx.quadraticCurveTo(size, size, size - r, size);
+            ctx.lineTo(r, size);
+            ctx.quadraticCurveTo(0, size, 0, size - r);
+            ctx.lineTo(0, r);
+            ctx.quadraticCurveTo(0, 0, r, 0);
+            ctx.closePath();
+            ctx.clip();
+
+            if (size <= 16) {
+                drawRocket16(ctx);
+            } else {
+                drawRocket(ctx, size);
+            }
+
+            ctx.restore();
         }
 
         // Draw all previews on load
@@ -147,7 +274,6 @@
         });
 
         function downloadIcon(size) {
-            // Create an offscreen canvas at the desired size
             const canvas = document.createElement("canvas");
             canvas.width = size;
             canvas.height = size;
@@ -161,7 +287,6 @@
 
         function downloadAll() {
             SIZES.forEach((size, i) => {
-                // Small delay between downloads so the browser doesn't block them
                 setTimeout(() => downloadIcon(size), i * 300);
             });
         }

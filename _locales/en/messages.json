@@ -1,0 +1,109 @@
+{
+  "extName": { "message": "Wallapop Tools" },
+  "extDescription": { "message": "Republish and manage your Wallapop products" },
+  "statusConnected": { "message": "Connected" },
+  "statusDisconnected": { "message": "Browse Wallapop to connect" },
+  "statusVerifying": { "message": "Verifying connection..." },
+  "statusConnecting": { "message": "Connecting..." },
+  "statusLoadingProducts": { "message": "Loading products..." },
+  "statusError": { "message": "Connection error" },
+  "btnRepublishAll": { "message": "Republish all" },
+  "btnLowerPrice": { "message": "Lower" },
+  "btnRaisePrice": { "message": "Raise" },
+  "btnLoadProducts": { "message": "Load products" },
+  "labelProducts": { "message": "Products" },
+  "labelLastRepublish": { "message": "Last republish" },
+  "labelAutoRepublish": { "message": "Auto-republish" },
+  "labelEvery": { "message": "Every" },
+  "labelSelectAll": {
+    "message": "Select all ($COUNT$)",
+    "placeholders": { "COUNT": { "content": "$1" } }
+  },
+  "progressRepublishing": { "message": "Republishing" },
+  "progressUpdating": { "message": "Updating prices" },
+  "progressStarting": { "message": "Starting..." },
+  "progressAdjusting": { "message": "Adjusting prices..." },
+  "progressLowering": { "message": "Lowering prices..." },
+  "progressRaising": { "message": "Raising prices..." },
+  "toastPricesUpdated": {
+    "message": "Prices updated: $SUCCESS$ ok, $FAILED$ errors",
+    "placeholders": {
+      "SUCCESS": { "content": "$1" },
+      "FAILED": { "content": "$2" }
+    }
+  },
+  "toastRepublished": {
+    "message": "Republished: $SUCCESS$ ok, $FAILED$ errors",
+    "placeholders": {
+      "SUCCESS": { "content": "$1" },
+      "FAILED": { "content": "$2" }
+    }
+  },
+  "errorCooldown": {
+    "message": "Wait $SECONDS$s before republishing again",
+    "placeholders": { "SECONDS": { "content": "$1" } }
+  },
+  "errorPercentInvalid": { "message": "Invalid percentage (between -50 and 50, not 0)" },
+  "errorTokenExpired": { "message": "Token expired. Browse Wallapop" },
+  "errorOperationInProgress": { "message": "An operation is already in progress" },
+  "errorNoToken": { "message": "No token. Browse Wallapop to connect." },
+  "errorProfileFailed": { "message": "Could not fetch user profile." },
+  "errorPercentZero": { "message": "Percentage cannot be 0" },
+  "errorInvalidItemId": { "message": "Invalid item ID." },
+  "labelTotalRepublishes": { "message": "Republishes" },
+  "labelSuccessRate": { "message": "Success rate" },
+  "labelSettings": { "message": "Settings" },
+  "labelLanguage": { "message": "Language" },
+  "labelRecentActivity": { "message": "Recent activity" },
+  "labelNoActivity": { "message": "No recent activity" },
+  "footerBy": { "message": "by Altitud Studio" },
+  "confirmPriceChange": {
+    "message": "You will $DIR$ the price of $COUNT$ products by $PCT$%. Continue?",
+    "placeholders": {
+      "DIR": { "content": "$1" },
+      "COUNT": { "content": "$2" },
+      "PCT": { "content": "$3" }
+    }
+  },
+  "dirRaise": { "message": "raise" },
+  "dirLower": { "message": "lower" },
+  "activityRepublish": {
+    "message": "$SUCCESS$ republished",
+    "placeholders": { "SUCCESS": { "content": "$1" } }
+  },
+  "activityPrices": {
+    "message": "Prices $PCT$% ($COUNT$ items)",
+    "placeholders": {
+      "PCT": { "content": "$1" },
+      "COUNT": { "content": "$2" }
+    }
+  },
+  "timeAgoMinutes": {
+    "message": "$MIN$m ago",
+    "placeholders": { "MIN": { "content": "$1" } }
+  },
+  "timeAgoHours": {
+    "message": "$HOURS$h ago",
+    "placeholders": { "HOURS": { "content": "$1" } }
+  },
+  "timeAgoDays": {
+    "message": "$DAYS$d ago",
+    "placeholders": { "DAYS": { "content": "$1" } }
+  },
+  "productsLoaded": {
+    "message": "$COUNT$ products loaded",
+    "placeholders": { "COUNT": { "content": "$1" } }
+  },
+  "labelMinimize": { "message": "Minimize" },
+  "labelConnectionStatus": { "message": "Connection status" },
+  "cooldownWait": {
+    "message": "Wait $TIME$",
+    "placeholders": { "TIME": { "content": "$1" } }
+  },
+  "autoRepublishEnabled": {
+    "message": "Auto-republish every $HOURS$h enabled",
+    "placeholders": { "HOURS": { "content": "$1" } }
+  },
+  "autoRepublishDisabled": { "message": "Auto-republish disabled" },
+  "startingRepublish": { "message": "Starting republish..." }
+}

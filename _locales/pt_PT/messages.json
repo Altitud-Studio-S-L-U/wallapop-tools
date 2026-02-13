@@ -1,0 +1,109 @@
+{
+  "extName": { "message": "Wallapop Tools" },
+  "extDescription": { "message": "Republica e gere os teus produtos no Wallapop" },
+  "statusConnected": { "message": "Conectado" },
+  "statusDisconnected": { "message": "Navega pelo Wallapop para conectar" },
+  "statusVerifying": { "message": "A verificar conexao..." },
+  "statusConnecting": { "message": "A conectar..." },
+  "statusLoadingProducts": { "message": "A carregar produtos..." },
+  "statusError": { "message": "Erro de conexao" },
+  "btnRepublishAll": { "message": "Republicar tudo" },
+  "btnLowerPrice": { "message": "Baixar" },
+  "btnRaisePrice": { "message": "Subir" },
+  "btnLoadProducts": { "message": "Carregar produtos" },
+  "labelProducts": { "message": "Produtos" },
+  "labelLastRepublish": { "message": "Ultima republicacao" },
+  "labelAutoRepublish": { "message": "Auto-republicar" },
+  "labelEvery": { "message": "A cada" },
+  "labelSelectAll": {
+    "message": "Selecionar todos ($COUNT$)",
+    "placeholders": { "COUNT": { "content": "$1" } }
+  },
+  "progressRepublishing": { "message": "A republicar" },
+  "progressUpdating": { "message": "A atualizar precos" },
+  "progressStarting": { "message": "A iniciar..." },
+  "progressAdjusting": { "message": "A ajustar precos..." },
+  "progressLowering": { "message": "A baixar precos..." },
+  "progressRaising": { "message": "A subir precos..." },
+  "toastPricesUpdated": {
+    "message": "Precos atualizados: $SUCCESS$ ok, $FAILED$ erros",
+    "placeholders": {
+      "SUCCESS": { "content": "$1" },
+      "FAILED": { "content": "$2" }
+    }
+  },
+  "toastRepublished": {
+    "message": "Republicados: $SUCCESS$ ok, $FAILED$ erros",
+    "placeholders": {
+      "SUCCESS": { "content": "$1" },
+      "FAILED": { "content": "$2" }
+    }
+  },
+  "errorCooldown": {
+    "message": "Espera $SECONDS$s antes de republicar novamente",
+    "placeholders": { "SECONDS": { "content": "$1" } }
+  },
+  "errorPercentInvalid": { "message": "Percentagem invalida (entre -50 e 50, diferente de 0)" },
+  "errorTokenExpired": { "message": "Token expirado. Navega pelo Wallapop" },
+  "errorOperationInProgress": { "message": "Ja existe uma operacao em curso" },
+  "errorNoToken": { "message": "Sem token. Navega pelo Wallapop para conectar." },
+  "errorProfileFailed": { "message": "Nao foi possivel obter o perfil do utilizador." },
+  "errorPercentZero": { "message": "A percentagem nao pode ser 0" },
+  "errorInvalidItemId": { "message": "ID do artigo invalido." },
+  "labelTotalRepublishes": { "message": "Republicacoes" },
+  "labelSuccessRate": { "message": "Taxa de sucesso" },
+  "labelSettings": { "message": "Definicoes" },
+  "labelLanguage": { "message": "Idioma" },
+  "labelRecentActivity": { "message": "Atividade recente" },
+  "labelNoActivity": { "message": "Sem atividade recente" },
+  "footerBy": { "message": "por Altitud Studio" },
+  "confirmPriceChange": {
+    "message": "Vais $DIR$ o preco de $COUNT$ produtos em $PCT$%. Continuar?",
+    "placeholders": {
+      "DIR": { "content": "$1" },
+      "COUNT": { "content": "$2" },
+      "PCT": { "content": "$3" }
+    }
+  },
+  "dirRaise": { "message": "subir" },
+  "dirLower": { "message": "baixar" },
+  "activityRepublish": {
+    "message": "$SUCCESS$ republicados",
+    "placeholders": { "SUCCESS": { "content": "$1" } }
+  },
+  "activityPrices": {
+    "message": "Precos $PCT$% ($COUNT$ artigos)",
+    "placeholders": {
+      "PCT": { "content": "$1" },
+      "COUNT": { "content": "$2" }
+    }
+  },
+  "timeAgoMinutes": {
+    "message": "ha $MIN$m",
+    "placeholders": { "MIN": { "content": "$1" } }
+  },
+  "timeAgoHours": {
+    "message": "ha $HOURS$h",
+    "placeholders": { "HOURS": { "content": "$1" } }
+  },
+  "timeAgoDays": {
+    "message": "ha $DAYS$d",
+    "placeholders": { "DAYS": { "content": "$1" } }
+  },
+  "productsLoaded": {
+    "message": "$COUNT$ produtos carregados",
+    "placeholders": { "COUNT": { "content": "$1" } }
+  },
+  "labelMinimize": { "message": "Minimizar" },
+  "labelConnectionStatus": { "message": "Estado da conexao" },
+  "cooldownWait": {
+    "message": "Espera $TIME$",
+    "placeholders": { "TIME": { "content": "$1" } }
+  },
+  "autoRepublishEnabled": {
+    "message": "Auto-republicacao a cada $HOURS$h ativada",
+    "placeholders": { "HOURS": { "content": "$1" } }
+  },
+  "autoRepublishDisabled": { "message": "Auto-republicacao desativada" },
+  "startingRepublish": { "message": "A iniciar republicacao..." }
+}

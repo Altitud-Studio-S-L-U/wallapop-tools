@@ -7,75 +7,118 @@
   <title>Wallapop Tools</title>
 </head>
 <body>
-  <div class="popup-container">
-    <!-- Header -->
-    <div class="popup-header">
-      <div class="popup-logo">WT</div>
-      <div>
-        <div class="popup-title">Wallapop Tools</div>
-        <div class="popup-subtitle">Automatiza tus ventas</div>
+  <header class="popup-header">
+    <img src="../icons/icon48.png" alt="" class="popup-logo" width="24" height="24">
+    <div class="popup-header-info">
+      <div class="popup-title">Wallapop Tools</div>
+      <div class="popup-subtitle" id="status-text">
+        <span class="popup-header-dot" id="status-dot"></span>
+        <span id="status-label" data-i18n="statusVerifying"></span>
       </div>
     </div>
+  </header>
 
-    <!-- Status -->
-    <div class="popup-status" id="popup-status">
-      <div class="status-dot" id="status-dot"></div>
-      <span id="status-text">Verificando conexion...</span>
+  <div class="popup-divider"></div>
+
+  <section class="popup-stats">
+    <div class="stat-card">
+      <div class="stat-value" id="stat-items">-</div>
+      <div class="stat-label" data-i18n="labelProducts"></div>
     </div>
-
-    <!-- Stats -->
-    <div class="popup-stats" id="popup-stats">
-      <div class="stat-card">
-        <div class="stat-value" id="stat-items">-</div>
-        <div class="stat-label">Productos</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-value" id="stat-last-republish">-</div>
-        <div class="stat-label">Ultimo republish</div>
-      </div>
+    <div class="stat-card">
+      <div class="stat-value" id="stat-last-republish">-</div>
+      <div class="stat-label" data-i18n="labelLastRepublish"></div>
     </div>
+    <div class="stat-card">
+      <div class="stat-value" id="stat-republishes">0</div>
+      <div class="stat-label" data-i18n="labelTotalRepublishes"></div>
+    </div>
+  </section>
 
-    <!-- Quick Actions -->
-    <div class="popup-section">
-      <div class="section-title">Acciones rapidas</div>
-      <button class="popup-btn popup-btn-primary" id="btn-republish">
-        Republicar todo
+  <div class="popup-divider"></div>
+
+  <section class="popup-section">
+    <button class="popup-btn popup-btn-primary" id="btn-republish">
+      <span class="popup-btn-icon">&#8635;</span><span data-i18n="btnRepublishAll"></span>
+    </button>
+  </section>
+
+  <section class="popup-section popup-price-section">
+    <div class="popup-price-stepper">
+      <button class="popup-stepper-btn" id="popup-price-minus">&minus;</button>
+      <input type="number" class="popup-stepper-input" id="popup-price-percent" value="5" min="1" max="50" step="1">
+      <button class="popup-stepper-btn" id="popup-price-plus">+</button>
+      <span class="popup-stepper-label">%</span>
+    </div>
+    <div class="popup-price-actions">
+      <button class="popup-btn popup-btn-secondary" id="popup-price-lower">
+        <span class="popup-btn-icon">&darr;</span><span data-i18n="btnLowerPrice"></span>
       </button>
-      <div class="popup-btn-row">
-        <button class="popup-btn popup-btn-secondary" id="btn-lower">
-          Bajar -5%
-        </button>
-        <button class="popup-btn popup-btn-secondary" id="btn-raise">
-          Subir +5%
-        </button>
-      </div>
+      <button class="popup-btn popup-btn-secondary" id="popup-price-raise">
+        <span class="popup-btn-icon">&uarr;</span><span data-i18n="btnRaisePrice"></span>
+      </button>
     </div>
+  </section>
 
-    <!-- Auto-republish -->
-    <div class="popup-section">
-      <div class="section-title">Auto-republicar</div>
-      <div class="auto-republish-row">
-        <label class="toggle-label">
-          <input type="checkbox" id="auto-republish-toggle">
-          <span class="toggle-slider"></span>
-        </label>
-        <span class="auto-republish-text">Cada</span>
-        <select id="auto-republish-interval" class="popup-select">
-          <option value="6">6h</option>
-          <option value="12" selected>12h</option>
-          <option value="24">24h</option>
-          <option value="48">48h</option>
-        </select>
-      </div>
+  <div class="popup-progress" id="progress-section">
+    <div class="progress-bar">
+      <div class="progress-fill" id="progress-fill"></div>
     </div>
-
-    <!-- Footer -->
-    <div class="popup-footer">
-      <span>Wallapop Tools v1.0</span>
-      <a href="#" id="btn-settings">Ajustes</a>
-    </div>
+    <div class="progress-text" id="progress-text"></div>
   </div>
 
+  <div class="popup-divider"></div>
+
+  <section class="popup-section">
+    <div class="auto-republish-row">
+      <span class="auto-republish-label" data-i18n="labelAutoRepublish"></span>
+      <label class="toggle-wrap">
+        <input type="checkbox" id="auto-republish-toggle">
+        <span class="toggle-track"></span>
+      </label>
+    </div>
+    <div class="interval-row">
+      <span class="interval-label" data-i18n="labelEvery"></span>
+      <select id="auto-republish-interval" class="popup-select">
+        <option value="6">6h</option>
+        <option value="12" selected>12h</option>
+        <option value="24">24h</option>
+        <option value="48">48h</option>
+      </select>
+    </div>
+  </section>
+
+  <div class="popup-divider"></div>
+
+  <section class="popup-section popup-activity-section">
+    <button class="popup-activity-toggle" id="activity-toggle">
+      <span class="popup-activity-arrow" id="activity-arrow">&#9656;</span>
+      <span data-i18n="labelRecentActivity"></span>
+    </button>
+    <div class="popup-activity-list" id="activity-list" style="display:none;"></div>
+  </section>
+
+  <div class="popup-divider"></div>
+
+  <section class="popup-section popup-settings-row">
+    <span class="settings-label" data-i18n="labelLanguage"></span>
+    <select id="language-select" class="popup-select">
+      <option value="es">Español</option>
+      <option value="en">English</option>
+      <option value="fr">Français</option>
+      <option value="it">Italiano</option>
+      <option value="pt_PT">Português</option>
+    </select>
+  </section>
+
+  <footer class="popup-footer">
+    <span class="popup-footer-version">v3.0</span>
+    <a href="https://altitudstudio.ad" target="_blank" rel="noopener" class="popup-footer-link">
+      <span data-i18n="footerBy"></span> &#8594;
+    </a>
+  </footer>
+
+  <script src="../utils/i18n-runtime.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

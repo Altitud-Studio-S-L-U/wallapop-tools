@@ -1,0 +1,13 @@
+{
+  "name": "wallapop-tools",
+  "private": true,
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "generate-icons": "node scripts/generate-icons.js"
+  },
+  "devDependencies": {
+    "canvas": "^3.1.0",
+    "vitest": "^3.0.0"
+  }
+}
