@@ -285,87 +285,74 @@ const WallapopAPI = (() => {
   }
 
   // ============================================================
-  // WRITE ENDPOINTS — [NEEDS VERIFICATION]
-  //
-  // These endpoints are NOT documented in any public source.
-  // You MUST discover them using Chrome DevTools:
-  //
-  // 1. Open es.wallapop.com, open DevTools (F12) → Network tab
-  // 2. Filter by "api.wallapop.com"
-  // 3. Perform the action manually (edit price, reserve, delete)
-  // 4. Look at the request: URL, method, request body
-  // 5. Update the endpoints below with the real ones
-  //
-  // The methods below are STUBS that will likely fail until
-  // the real endpoints are discovered and filled in.
+  // WRITE ENDPOINTS (verified via DevTools, Feb 2026)
   // ============================================================
 
   /**
-   * [NEEDS VERIFICATION] Republish/bump an item.
-   *
-   * Strategy: Wallapop may not have a direct "republish" endpoint.
-   * Common workarounds used by other marketplace automators:
-   *   - Reserve → unreserve (toggles visibility, may bump)
-   *   - Edit item with minimal change (triggers re-index)
-   *   - Delete and recreate (nuclear option)
-   *
-   * To discover the real method:
-   *   1. Open DevTools Network tab on Wallapop
-   *   2. Click "Reservar" on one of your items
-   *   3. Note the exact URL, method, and body
-   *   4. Click "Quitar reserva"
-   *   5. Note that request too
-   *   6. Update this function with the real endpoints
+   * Reactivate/republish an item.
+   * Verified: PUT /api/v3/items/{id}/reactivate (empty body)
+   * This brings expired items back and bumps active ones.
    */
   async function republishItem(itemId) {
-    // STUB — replace with real endpoints after DevTools discovery
-    console.warn(
-      `[WallapopTools] republishItem(${itemId}): endpoint no verificado. ` +
-        'Usa DevTools para descubrir el endpoint real.'
-    );
-
-    // Attempt: reserve then unreserve (common workaround)
-    await _apiCall(`/api/v3/items/${itemId}/reserve`, {
+    return _apiCall(`/api/v3/items/${itemId}/reactivate`, {
       method: 'PUT',
-      body: JSON.stringify({ reserved: true }),
-    });
-
-    await new Promise((r) => setTimeout(r, 1000));
-
-    return _apiCall(`/api/v3/items/${itemId}/reserve`, {
-      method: 'PUT',
-      body: JSON.stringify({ reserved: false }),
     });
   }
 
   /**
-   * [NEEDS VERIFICATION] Update an item's price.
+   * Update an item's price.
+   * Verified: PUT /api/v3/items/{id} with full item object.
+   * Wallapop requires sending the complete item, not just the changed field.
+   * Price lives in attributes.price_amount.
    *
-   * To discover:
-   *   1. Open DevTools Network tab
-   *   2. Edit the price of one of your items on Wallapop
-   *   3. Note the URL, method (likely PUT or PATCH), and body structure
-   *   4. Update this function
+   * Flow: GET item details → modify price → PUT full object back.
    */
   async function updateItemPrice(itemId, newPrice) {
-    console.warn(
-      `[WallapopTools] updateItemPrice(${itemId}, ${newPrice}): endpoint no verificado.`
-    );
+    // 1. Get current item data
+    const item = await getItemDetails(itemId);
+
+    // 2. Build the PUT body matching Wallapop's expected structure
+    const body = {
+      attributes: {
+        title: item.title?.original || item.title,
+        description: item.description?.original || item.description,
+        price_amount: newPrice,
+        condition: item.type_attributes?.condition?.value || 'good',
+      },
+      category_leaf_id: item.taxonomy?.[item.taxonomy.length - 1]?.id || null,
+      apply_discount: false,
+      delivery: {
+        allowed_by_user: item.shipping?.user_allows_shipping || false,
+        max_weight_kg: 10,
+        ...(item.shipping?.cost_configuration_id
+          ? { cost_configuration_id: item.shipping.cost_configuration_id }
+          : {}),
+      },
+      location: {
+        latitude: item.location?.latitude,
+        longitude: item.location?.longitude,
+        approximated: false,
+      },
+      pictures: (item.images || []).map((img, i) => ({
+        id: img.id,
+        order: i,
+      })),
+    };
 
     return _apiCall(`/api/v3/items/${itemId}`, {
       method: 'PUT',
-      body: JSON.stringify({ sale_price: newPrice }),
+      body: JSON.stringify(body),
     });
   }
 
   /**
-   * [NEEDS VERIFICATION] Mark item as reserved.
+   * Reserve/unreserve an item.
+   * NOT YET VERIFIED — discover via DevTools by clicking "Reservar".
    */
   async function reserveItem(itemId, reserved = true) {
     console.warn(
       `[WallapopTools] reserveItem(${itemId}): endpoint no verificado.`
     );
-
     return _apiCall(`/api/v3/items/${itemId}/reserve`, {
       method: 'PUT',
       body: JSON.stringify({ reserved }),
@@ -373,13 +360,13 @@ const WallapopAPI = (() => {
   }
 
   /**
-   * [NEEDS VERIFICATION] Delete an item.
+   * Delete an item.
+   * NOT YET VERIFIED — discover via DevTools by deleting an item.
    */
   async function deleteItem(itemId) {
     console.warn(
       `[WallapopTools] deleteItem(${itemId}): endpoint no verificado.`
     );
-
     return _apiCall(`/api/v3/items/${itemId}`, {
       method: 'DELETE',
     });

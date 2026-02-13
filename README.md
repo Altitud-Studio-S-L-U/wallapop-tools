@@ -135,17 +135,25 @@ Confirmados por clientes open source que interactúan con la API real:
 | Búsqueda | GET | `/api/v3/general/search` | wallapopy |
 | Perks de pago | GET | `/api/v3/payments/perks/me` | uapop |
 
-### Endpoints NO verificados (escritura)
+### Endpoints verificados (escritura)
 
-Los endpoints de escritura (republicar, editar precio, reservar, eliminar) **no están documentados en ninguna fuente pública**. Los stubs en `wallapop-api.js` son aproximaciones que deben verificarse manualmente:
+Descubiertos via Chrome DevTools (Feb 2026):
 
-1. Abre `es.wallapop.com` con Chrome DevTools (`F12`)
-2. Ve a la pestaña **Network** → filtra por `api.wallapop.com`
-3. Realiza la acción manualmente (editar precio, reservar, eliminar)
-4. Observa la URL, método y body de la petición
-5. Actualiza los endpoints en `utils/wallapop-api.js`
+| Acción | Método | Endpoint | Body |
+|---|---|---|---|
+| Reactivar/Republicar | PUT | `/api/v3/items/{id}/reactivate` | vacío |
+| Editar item (precio, etc.) | PUT | `/api/v3/items/{id}` | objeto completo del item |
 
-> **Importante:** Hasta que no se descubran los endpoints reales de escritura, las funciones de republicar, editar precio y eliminar mostrarán un warning en consola y probablemente fallarán.
+El precio va dentro de `attributes.price_amount`. Para editar hay que enviar el objeto completo (GET → modificar → PUT).
+
+### Endpoints pendientes de verificar
+
+| Acción | Método probable | Endpoint probable |
+|---|---|---|
+| Reservar | PUT | `/api/v3/items/{id}/reserve` |
+| Eliminar | DELETE | `/api/v3/items/{id}` |
+
+> Para verificar los pendientes: DevTools (`F12`) → Network → filtra `api.wallapop.com` → realiza la acción manualmente.
 
 ## Publicación en Chrome Web Store
 

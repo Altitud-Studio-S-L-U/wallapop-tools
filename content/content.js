@@ -159,8 +159,8 @@
             .map(
               (item) => `
             <div class="wt-item-row">
-              <span class="wt-item-title">${escapeHtml(item.title || item.name || 'Sin titulo')}</span>
-              <span class="wt-item-price">${item.sale_price || item.price || '?'}${item.currency || '\u20AC'}</span>
+              <span class="wt-item-title">${escapeHtml(_getItemTitle(item))}</span>
+              <span class="wt-item-price">${_getItemPrice(item)}\u20AC</span>
             </div>
           `
             )
@@ -262,7 +262,7 @@
 
       for (let i = 0; i < items.length; i++) {
         const item = items[i];
-        const currentPrice = parseFloat(item.sale_price || item.price || 0);
+        const currentPrice = _getItemPrice(item);
         if (currentPrice <= 0) continue;
 
         const newPrice = Math.round(currentPrice * (1 + percentChange / 100) * 100) / 100;
@@ -340,6 +340,18 @@
     const div = document.createElement('div');
     div.textContent = str;
     return div.innerHTML;
+  }
+
+  // Parse item title from Wallapop's real API response structure
+  function _getItemTitle(item) {
+    return item.title?.original || item.title?.translated || item.title || item.name || 'Sin titulo';
+  }
+
+  // Parse item price from Wallapop's real API response structure
+  function _getItemPrice(item) {
+    return parseFloat(
+      item.price?.cash?.amount || item.sale_price || item.price?.amount || item.price || 0
+    );
   }
 
   // ============================================================
