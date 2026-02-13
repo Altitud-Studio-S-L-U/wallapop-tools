@@ -1,10 +1,10 @@
 {
   "manifest_version": 3,
   "name": "__MSG_extName__",
-  "version": "3.0.0",
+  "version": "5.0.0",
   "description": "__MSG_extDescription__",
   "default_locale": "es",
-  "permissions": ["storage", "alarms"],
+  "permissions": ["storage", "alarms", "notifications"],
   "host_permissions": [
     "https://api.wallapop.com/*",
     "https://es.wallapop.com/*",
@@ -36,17 +36,6 @@
       ],
       "js": ["content/bridge.js"],
       "run_at": "document_start"
-    },
-    {
-      "matches": [
-        "https://es.wallapop.com/*",
-        "https://it.wallapop.com/*",
-        "https://fr.wallapop.com/*",
-        "https://pt.wallapop.com/*"
-      ],
-      "js": ["utils/i18n-runtime.js", "content/toolbar.js"],
-      "css": ["content/toolbar.css"],
-      "run_at": "document_idle"
     }
   ],
   "web_accessible_resources": [

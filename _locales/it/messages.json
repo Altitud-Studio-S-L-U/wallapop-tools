@@ -3,34 +3,38 @@
   "extDescription": { "message": "Ripubblica e gestisci i tuoi prodotti su Wallapop" },
   "statusConnected": { "message": "Connesso" },
   "statusDisconnected": { "message": "Naviga su Wallapop per connetterti" },
-  "statusVerifying": { "message": "Verifica connessione..." },
-  "statusConnecting": { "message": "Connessione..." },
+  "statusVerifying": { "message": "Verifica..." },
   "statusLoadingProducts": { "message": "Caricamento prodotti..." },
   "statusError": { "message": "Errore di connessione" },
   "btnRepublishAll": { "message": "Ripubblica tutto" },
+  "btnRepublishSelected": { "message": "Ripubblica selezione" },
   "btnLowerPrice": { "message": "Abbassa" },
   "btnRaisePrice": { "message": "Alza" },
-  "btnLoadProducts": { "message": "Carica prodotti" },
+  "btnExportCSV": { "message": "Esporta CSV" },
+  "btnApplyPrice": { "message": "Applica" },
   "labelProducts": { "message": "Prodotti" },
-  "labelLastRepublish": { "message": "Ultima ripubblicazione" },
+  "labelLastRepublish": { "message": "Ultimo republish" },
+  "labelTotalRepublishes": { "message": "Ripubblicazioni" },
   "labelAutoRepublish": { "message": "Auto-ripubblica" },
-  "labelEvery": { "message": "Ogni" },
+  "labelRecentActivity": { "message": "Attivita recente" },
+  "labelNoActivity": { "message": "Nessuna attivita recente" },
+  "labelDaysListed": { "message": "giorni pubblicato" },
   "labelSelectAll": {
     "message": "Seleziona tutti ($COUNT$)",
     "placeholders": { "COUNT": { "content": "$1" } }
   },
+  "labelStaleCount": {
+    "message": "$COUNT$ stagnanti",
+    "placeholders": { "COUNT": { "content": "$1" } }
+  },
+  "footerBy": { "message": "by Altitud Studio" },
+  "startingRepublish": { "message": "Avvio ripubblicazione..." },
   "progressRepublishing": { "message": "Ripubblicazione" },
   "progressUpdating": { "message": "Aggiornamento prezzi" },
-  "progressStarting": { "message": "Avvio..." },
-  "progressAdjusting": { "message": "Modifica prezzi..." },
-  "progressLowering": { "message": "Riduzione prezzi..." },
-  "progressRaising": { "message": "Aumento prezzi..." },
-  "toastPricesUpdated": {
-    "message": "Prezzi aggiornati: $SUCCESS$ ok, $FAILED$ errori",
-    "placeholders": {
-      "SUCCESS": { "content": "$1" },
-      "FAILED": { "content": "$2" }
-    }
+  "progressAdjusting": { "message": "Regolazione prezzi..." },
+  "cooldownWait": {
+    "message": "Attendi $TIME$",
+    "placeholders": { "TIME": { "content": "$1" } }
   },
   "toastRepublished": {
     "message": "Ripubblicati: $SUCCESS$ ok, $FAILED$ errori",
@@ -39,34 +43,21 @@
       "FAILED": { "content": "$2" }
     }
   },
-  "errorCooldown": {
-    "message": "Attendi $SECONDS$s prima di ripubblicare",
-    "placeholders": { "SECONDS": { "content": "$1" } }
-  },
-  "errorPercentInvalid": { "message": "Percentuale non valida (tra -50 e 50, diversa da 0)" },
-  "errorTokenExpired": { "message": "Token scaduto. Naviga su Wallapop" },
-  "errorOperationInProgress": { "message": "Un'operazione e gia in corso" },
-  "errorNoToken": { "message": "Nessun token. Naviga su Wallapop per connetterti." },
-  "errorProfileFailed": { "message": "Impossibile recuperare il profilo utente." },
-  "errorPercentZero": { "message": "La percentuale non puo essere 0" },
-  "errorInvalidItemId": { "message": "ID articolo non valido." },
-  "labelTotalRepublishes": { "message": "Ripubblicazioni" },
-  "labelSuccessRate": { "message": "Tasso di successo" },
-  "labelSettings": { "message": "Impostazioni" },
-  "labelLanguage": { "message": "Lingua" },
-  "labelRecentActivity": { "message": "Attivita recente" },
-  "labelNoActivity": { "message": "Nessuna attivita recente" },
-  "footerBy": { "message": "di Altitud Studio" },
-  "confirmPriceChange": {
-    "message": "Stai per $DIR$ il prezzo di $COUNT$ prodotti del $PCT$%. Continuare?",
+  "toastPricesUpdated": {
+    "message": "Prezzi aggiornati: $SUCCESS$ ok, $FAILED$ errori",
     "placeholders": {
-      "DIR": { "content": "$1" },
-      "COUNT": { "content": "$2" },
-      "PCT": { "content": "$3" }
+      "SUCCESS": { "content": "$1" },
+      "FAILED": { "content": "$2" }
     }
   },
-  "dirRaise": { "message": "alzare" },
-  "dirLower": { "message": "abbassare" },
+  "toastPriceApplied": {
+    "message": "$TITLE$ aggiornato a $PRICE$\u20AC",
+    "placeholders": {
+      "TITLE": { "content": "$1" },
+      "PRICE": { "content": "$2" }
+    }
+  },
+  "toastCSVExported": { "message": "CSV esportato" },
   "activityRepublish": {
     "message": "$SUCCESS$ ripubblicati",
     "placeholders": { "SUCCESS": { "content": "$1" } }
@@ -90,20 +81,15 @@
     "message": "$DAYS$g fa",
     "placeholders": { "DAYS": { "content": "$1" } }
   },
-  "productsLoaded": {
-    "message": "$COUNT$ prodotti caricati",
-    "placeholders": { "COUNT": { "content": "$1" } }
+  "errorNoToken": { "message": "Nessun token. Naviga su Wallapop." },
+  "errorProfileFailed": { "message": "Impossibile ottenere il profilo." },
+  "errorPercentInvalid": { "message": "Percentuale non valida" },
+  "errorInvalidItemId": { "message": "ID articolo non valido" },
+  "errorCooldown": {
+    "message": "Attendi $SECONDS$s prima di ripubblicare",
+    "placeholders": { "SECONDS": { "content": "$1" } }
   },
-  "labelMinimize": { "message": "Minimizza" },
-  "labelConnectionStatus": { "message": "Stato connessione" },
-  "cooldownWait": {
-    "message": "Attendi $TIME$",
-    "placeholders": { "TIME": { "content": "$1" } }
-  },
-  "autoRepublishEnabled": {
-    "message": "Auto-ripubblicazione ogni $HOURS$h attivata",
-    "placeholders": { "HOURS": { "content": "$1" } }
-  },
-  "autoRepublishDisabled": { "message": "Auto-ripubblicazione disattivata" },
-  "startingRepublish": { "message": "Avvio ripubblicazione..." }
+  "errorOperationInProgress": { "message": "Operazione in corso" },
+  "errorTokenExpired": { "message": "Token scaduto. Naviga su Wallapop" },
+  "errorNoItemsSelected": { "message": "Nessun articolo selezionato" }
 }

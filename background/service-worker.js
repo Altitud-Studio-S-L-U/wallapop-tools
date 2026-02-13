@@ -1,10 +1,12 @@
 /**
- * Background Service Worker - Wallapop Tools v3.0
+ * Background Service Worker - Wallapop Tools v5.0
  *
  * Central hub: receives tokens from interceptor, stores in session storage,
  * executes all API calls, handles rate limiting, alarms, badge updates,
- * activity logging, and statistics.
- * Content scripts and popup communicate exclusively via chrome.runtime messages.
+ * activity logging, statistics, and item tracking.
+ *
+ * Features: republish all/selected, batch price adjust, auto-republish,
+ * single item price edit, CSV export.
  */
 
 importScripts('../utils/wallapop-api.js');
@@ -13,7 +15,7 @@ importScripts('../utils/wallapop-api.js');
 // STATE
 // ============================================================
 
-const COOLDOWN_MS = 5 * 60 * 1000; // 5 min between republish operations
+const COOLDOWN_MS = 5 * 60 * 1000;
 let _lastRepublishStart = 0;
 let _operationInProgress = false;
 let _cachedItems = null;
@@ -90,15 +92,6 @@ async function logActivity(entry) {
   await chrome.storage.local.set({ activity_log: log.slice(0, 50) });
 }
 
-async function updateStats(success, failed) {
-  const data = await chrome.storage.local.get(['stats']);
-  const stats = data.stats || { totalRepublishes: 0, totalPriceChanges: 0, totalSuccess: 0, totalFailed: 0 };
-  stats.totalSuccess += success;
-  stats.totalFailed += failed;
-  await chrome.storage.local.set({ stats });
-  return stats;
-}
-
 async function updateRepublishStats(success, failed) {
   const data = await chrome.storage.local.get(['stats']);
   const stats = data.stats || { totalRepublishes: 0, totalPriceChanges: 0, totalSuccess: 0, totalFailed: 0 };
@@ -118,6 +111,48 @@ async function updatePriceStats(success, failed) {
 }
 
 // ============================================================
+// ITEM TRACKING (days since listed)
+// ============================================================
+
+async function updateItemTracking(items) {
+  const data = await chrome.storage.local.get(['item_tracking']);
+  const tracking = data.item_tracking || {};
+  const now = Date.now();
+
+  for (const item of items) {
+    const id = String(item.id);
+    const price = WallapopAPI.getItemPrice(item);
+    const creationDate = item.creation_date || item.modified_date || item.publish_date;
+
+    if (!tracking[id]) {
+      tracking[id] = {
+        firstSeen: creationDate ? new Date(creationDate).getTime() : now,
+        lastPrice: price,
+      };
+    } else {
+      if (tracking[id].lastPrice !== price) {
+        tracking[id].lastPrice = price;
+      }
+    }
+  }
+
+  const currentIds = new Set(items.map((i) => String(i.id)));
+  for (const id of Object.keys(tracking)) {
+    if (!currentIds.has(id)) {
+      delete tracking[id];
+    }
+  }
+
+  await chrome.storage.local.set({ item_tracking: tracking });
+  return tracking;
+}
+
+function getDaysListed(trackingEntry) {
+  if (!trackingEntry?.firstSeen) return 0;
+  return Math.floor((Date.now() - trackingEntry.firstSeen) / 86400000);
+}
+
+// ============================================================
 // CORE OPERATIONS
 // ============================================================
 
@@ -128,6 +163,7 @@ async function loadAllItems() {
 
   await chrome.storage.local.set({ wallapop_item_count: items.length });
   updateBadge(items.length);
+  await updateItemTracking(items);
 
   return items;
 }
@@ -180,9 +216,52 @@ async function republishAll(sendProgress) {
 
     const result = { total, success, failed, date: new Date().toISOString() };
     await chrome.storage.local.set({ last_republish: result });
-
-    // Log activity and update stats
     await logActivity({ type: 'republish', total, success, failed });
+    await updateRepublishStats(success, failed);
+
+    return result;
+  } finally {
+    _operationInProgress = false;
+  }
+}
+
+async function republishSelected(itemIds, sendProgress) {
+  if (_operationInProgress) {
+    throw new Error(chrome.i18n.getMessage('errorOperationInProgress'));
+  }
+
+  _operationInProgress = true;
+
+  try {
+    const session = await ensureUserId();
+    const validIds = itemIds.map(validateItemId);
+    const total = validIds.length;
+    let success = 0;
+    let failed = 0;
+
+    for (let i = 0; i < validIds.length; i++) {
+      if (sendProgress) {
+        sendProgress({ current: i + 1, total, success, failed });
+      }
+
+      try {
+        await WallapopAPI.republishItem(session.token, session.deviceId, validIds[i]);
+        success++;
+      } catch (err) {
+        if (err.message === 'TOKEN_EXPIRED') {
+          await clearToken();
+          throw new Error(chrome.i18n.getMessage('errorTokenExpired'));
+        }
+        failed++;
+      }
+
+      if (i < validIds.length - 1) {
+        await new Promise((r) => setTimeout(r, 2000 + Math.random() * 3000));
+      }
+    }
+
+    const result = { total, success, failed, date: new Date().toISOString() };
+    await logActivity({ type: 'republish_selected', total, success, failed });
     await updateRepublishStats(success, failed);
 
     return result;
@@ -203,10 +282,7 @@ async function adjustAllPrices(percentChange, sendProgress, itemIds) {
     const session = await ensureUserId();
     let items = _cachedItems;
     if (!items) {
-      // Notify UI that we're loading items first
-      if (sendProgress) {
-        sendProgress({ current: 0, total: 0, loading: true });
-      }
+      if (sendProgress) sendProgress({ current: 0, total: 0, loading: true });
       items = await loadAllItems();
     }
 
@@ -247,8 +323,6 @@ async function adjustAllPrices(percentChange, sendProgress, itemIds) {
     }
 
     const result = { total, success, failed, percent };
-
-    // Log activity and update stats
     await logActivity({ type: 'prices', percent, total, success, failed });
     await updatePriceStats(success, failed);
 
@@ -256,6 +330,15 @@ async function adjustAllPrices(percentChange, sendProgress, itemIds) {
   } finally {
     _operationInProgress = false;
   }
+}
+
+async function updateSingleItemPrice(itemId, newPrice) {
+  const session = await ensureUserId();
+  const id = validateItemId(itemId);
+  await WallapopAPI.updateItemPrice(session.token, session.deviceId, id, newPrice);
+  await logActivity({ type: 'price_exact', itemId: id, newPrice });
+  await updatePriceStats(1, 0);
+  return { success: true, itemId: id, newPrice };
 }
 
 async function clearToken() {
@@ -285,7 +368,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   const { type } = message;
 
   switch (type) {
-    // --- From interceptor.js ---
     case 'TOKEN_CAPTURED': {
       const token = message.token;
       const deviceId = message.deviceId;
@@ -305,7 +387,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       break;
     }
 
-    // --- From popup/toolbar: status ---
     case 'GET_STATUS': {
       (async () => {
         try {
@@ -326,17 +407,27 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return true;
     }
 
-    // --- Load items ---
     case 'LOAD_ITEMS': {
       (async () => {
         try {
           const items = await loadAllItems();
+          const trackingData = await chrome.storage.local.get(['item_tracking']);
+          const tracking = trackingData.item_tracking || {};
+
           sendResponse({
-            items: items.map((item) => ({
-              id: item.id,
-              title: WallapopAPI.getItemTitle(item),
-              price: WallapopAPI.getItemPrice(item),
-            })),
+            items: items.map((item) => {
+              const id = String(item.id);
+              const entry = tracking[id];
+              return {
+                id: item.id,
+                title: WallapopAPI.getItemTitle(item),
+                price: WallapopAPI.getItemPrice(item),
+                daysListed: entry ? getDaysListed(entry) : null,
+                category: (Array.isArray(item.taxonomy) ? item.taxonomy[item.taxonomy.length - 1]?.name : '') || '',
+                webSlug: item.web_slug || null,
+                imageUrl: (item.images || item.pictures || [])[0]?.urls?.small || null,
+              };
+            }),
           });
         } catch (err) {
           sendResponse({ error: err.message });
@@ -345,7 +436,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return true;
     }
 
-    // --- Republish all ---
     case 'REPUBLISH_ALL': {
       (async () => {
         try {
@@ -362,7 +452,38 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return true;
     }
 
-    // --- Adjust prices (all) ---
+    case 'REPUBLISH_SELECTED': {
+      if (!message.itemIds?.length) {
+        sendResponse({ error: chrome.i18n.getMessage('errorNoItemsSelected') });
+        return true;
+      }
+      sendResponse({ started: true });
+      (async () => {
+        try {
+          const sendProgress = (progress) => {
+            chrome.runtime.sendMessage({ type: 'PROGRESS', operation: 'republish', ...progress }).catch(() => {});
+          };
+          const result = await republishSelected(message.itemIds, sendProgress);
+          chrome.runtime.sendMessage({ type: 'OPERATION_COMPLETE', operation: 'republish', ...result }).catch(() => {});
+        } catch (err) {
+          chrome.runtime.sendMessage({ type: 'OPERATION_COMPLETE', operation: 'republish', success: 0, failed: 0, error: err.message }).catch(() => {});
+        }
+      })();
+      return true;
+    }
+
+    case 'UPDATE_ITEM_PRICE': {
+      (async () => {
+        try {
+          const result = await updateSingleItemPrice(message.itemId, message.newPrice);
+          sendResponse(result);
+        } catch (err) {
+          sendResponse({ error: err.message });
+        }
+      })();
+      return true;
+    }
+
     case 'ADJUST_PRICES': {
       try {
         validatePercent(message.percent);
@@ -385,7 +506,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return true;
     }
 
-    // --- Adjust prices (selected items) ---
     case 'ADJUST_SELECTED_PRICES': {
       try {
         validatePercent(message.percent);
@@ -408,7 +528,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return true;
     }
 
-    // --- Auto-republish scheduling ---
+    case 'EXPORT_CSV': {
+      (async () => {
+        try {
+          let items = _cachedItems;
+          if (!items) items = await loadAllItems();
+          const csv = WallapopAPI.exportItemsToCSV(items);
+          sendResponse({ csv });
+        } catch (err) {
+          sendResponse({ error: err.message });
+        }
+      })();
+      return true;
+    }
+
     case 'SET_AUTO_REPUBLISH': {
       (async () => {
         try {
@@ -422,13 +555,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             await chrome.storage.local.set({
               auto_republish: { enabled: true, intervalHours: hours },
             });
-            sendResponse({ success: true, msg: chrome.i18n.getMessage('autoRepublishEnabled', [String(hours)]) });
+            sendResponse({ success: true });
           } else {
             chrome.alarms.clear('auto-republish');
             await chrome.storage.local.set({
               auto_republish: { enabled: false },
             });
-            sendResponse({ success: true, msg: chrome.i18n.getMessage('autoRepublishDisabled') });
+            sendResponse({ success: true });
           }
         } catch (err) {
           sendResponse({ error: err.message });
@@ -448,7 +581,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return true;
     }
 
-    // --- Activity log ---
     case 'GET_ACTIVITY_LOG': {
       (async () => {
         const data = await chrome.storage.local.get(['activity_log']);
@@ -458,7 +590,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return true;
     }
 
-    // --- Stats ---
     case 'GET_STATS': {
       (async () => {
         const data = await chrome.storage.local.get(['stats']);
@@ -473,7 +604,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 // ============================================================
-// ALARMS - Auto-republish
+// ALARMS
 // ============================================================
 
 chrome.alarms.onAlarm.addListener(async (alarm) => {
@@ -484,6 +615,15 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
       };
       const result = await republishAll(sendProgress);
       chrome.runtime.sendMessage({ type: 'OPERATION_COMPLETE', operation: 'republish', ...result }).catch(() => {});
+
+      try {
+        chrome.notifications.create('auto-republish-' + Date.now(), {
+          type: 'basic',
+          iconUrl: '../icons/icon128.png',
+          title: 'Wallapop Tools',
+          message: chrome.i18n.getMessage('toastRepublished', [String(result.success), String(result.failed)]),
+        });
+      } catch {}
     } catch (err) {
       console.warn('[WallapopTools] Auto-republish failed:', err.message);
     }
@@ -507,11 +647,6 @@ chrome.storage.onChanged.addListener((changes) => {
 chrome.runtime.onInstalled.addListener((details) => {
   if (details.reason === 'install') {
     chrome.storage.local.set({
-      settings: {
-        republishDelay: 3000,
-        priceChangeStep: 5,
-        autoRepublishHours: 12,
-      },
       stats: {
         totalRepublishes: 0,
         totalPriceChanges: 0,
@@ -519,6 +654,7 @@ chrome.runtime.onInstalled.addListener((details) => {
         totalFailed: 0,
       },
       activity_log: [],
+      item_tracking: {},
     });
   }
 });

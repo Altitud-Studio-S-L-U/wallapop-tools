@@ -3,34 +3,38 @@
   "extDescription": { "message": "Republica e gere os teus produtos no Wallapop" },
   "statusConnected": { "message": "Conectado" },
   "statusDisconnected": { "message": "Navega pelo Wallapop para conectar" },
-  "statusVerifying": { "message": "A verificar conexao..." },
-  "statusConnecting": { "message": "A conectar..." },
+  "statusVerifying": { "message": "A verificar..." },
   "statusLoadingProducts": { "message": "A carregar produtos..." },
   "statusError": { "message": "Erro de conexao" },
   "btnRepublishAll": { "message": "Republicar tudo" },
+  "btnRepublishSelected": { "message": "Republicar selecao" },
   "btnLowerPrice": { "message": "Baixar" },
   "btnRaisePrice": { "message": "Subir" },
-  "btnLoadProducts": { "message": "Carregar produtos" },
+  "btnExportCSV": { "message": "Exportar CSV" },
+  "btnApplyPrice": { "message": "Aplicar" },
   "labelProducts": { "message": "Produtos" },
-  "labelLastRepublish": { "message": "Ultima republicacao" },
+  "labelLastRepublish": { "message": "Ultimo republish" },
+  "labelTotalRepublishes": { "message": "Republicacoes" },
   "labelAutoRepublish": { "message": "Auto-republicar" },
-  "labelEvery": { "message": "A cada" },
+  "labelRecentActivity": { "message": "Atividade recente" },
+  "labelNoActivity": { "message": "Sem atividade recente" },
+  "labelDaysListed": { "message": "dias publicado" },
   "labelSelectAll": {
     "message": "Selecionar todos ($COUNT$)",
     "placeholders": { "COUNT": { "content": "$1" } }
   },
+  "labelStaleCount": {
+    "message": "$COUNT$ estagnados",
+    "placeholders": { "COUNT": { "content": "$1" } }
+  },
+  "footerBy": { "message": "by Altitud Studio" },
+  "startingRepublish": { "message": "A iniciar republicacao..." },
   "progressRepublishing": { "message": "A republicar" },
   "progressUpdating": { "message": "A atualizar precos" },
-  "progressStarting": { "message": "A iniciar..." },
   "progressAdjusting": { "message": "A ajustar precos..." },
-  "progressLowering": { "message": "A baixar precos..." },
-  "progressRaising": { "message": "A subir precos..." },
-  "toastPricesUpdated": {
-    "message": "Precos atualizados: $SUCCESS$ ok, $FAILED$ erros",
-    "placeholders": {
-      "SUCCESS": { "content": "$1" },
-      "FAILED": { "content": "$2" }
-    }
+  "cooldownWait": {
+    "message": "Espera $TIME$",
+    "placeholders": { "TIME": { "content": "$1" } }
   },
   "toastRepublished": {
     "message": "Republicados: $SUCCESS$ ok, $FAILED$ erros",
@@ -39,40 +43,27 @@
       "FAILED": { "content": "$2" }
     }
   },
-  "errorCooldown": {
-    "message": "Espera $SECONDS$s antes de republicar novamente",
-    "placeholders": { "SECONDS": { "content": "$1" } }
-  },
-  "errorPercentInvalid": { "message": "Percentagem invalida (entre -50 e 50, diferente de 0)" },
-  "errorTokenExpired": { "message": "Token expirado. Navega pelo Wallapop" },
-  "errorOperationInProgress": { "message": "Ja existe uma operacao em curso" },
-  "errorNoToken": { "message": "Sem token. Navega pelo Wallapop para conectar." },
-  "errorProfileFailed": { "message": "Nao foi possivel obter o perfil do utilizador." },
-  "errorPercentZero": { "message": "A percentagem nao pode ser 0" },
-  "errorInvalidItemId": { "message": "ID do artigo invalido." },
-  "labelTotalRepublishes": { "message": "Republicacoes" },
-  "labelSuccessRate": { "message": "Taxa de sucesso" },
-  "labelSettings": { "message": "Definicoes" },
-  "labelLanguage": { "message": "Idioma" },
-  "labelRecentActivity": { "message": "Atividade recente" },
-  "labelNoActivity": { "message": "Sem atividade recente" },
-  "footerBy": { "message": "por Altitud Studio" },
-  "confirmPriceChange": {
-    "message": "Vais $DIR$ o preco de $COUNT$ produtos em $PCT$%. Continuar?",
+  "toastPricesUpdated": {
+    "message": "Precos atualizados: $SUCCESS$ ok, $FAILED$ erros",
     "placeholders": {
-      "DIR": { "content": "$1" },
-      "COUNT": { "content": "$2" },
-      "PCT": { "content": "$3" }
+      "SUCCESS": { "content": "$1" },
+      "FAILED": { "content": "$2" }
     }
   },
-  "dirRaise": { "message": "subir" },
-  "dirLower": { "message": "baixar" },
+  "toastPriceApplied": {
+    "message": "$TITLE$ atualizado para $PRICE$\u20AC",
+    "placeholders": {
+      "TITLE": { "content": "$1" },
+      "PRICE": { "content": "$2" }
+    }
+  },
+  "toastCSVExported": { "message": "CSV exportado" },
   "activityRepublish": {
     "message": "$SUCCESS$ republicados",
     "placeholders": { "SUCCESS": { "content": "$1" } }
   },
   "activityPrices": {
-    "message": "Precos $PCT$% ($COUNT$ artigos)",
+    "message": "Precos $PCT$% ($COUNT$ itens)",
     "placeholders": {
       "PCT": { "content": "$1" },
       "COUNT": { "content": "$2" }
@@ -90,20 +81,15 @@
     "message": "ha $DAYS$d",
     "placeholders": { "DAYS": { "content": "$1" } }
   },
-  "productsLoaded": {
-    "message": "$COUNT$ produtos carregados",
-    "placeholders": { "COUNT": { "content": "$1" } }
+  "errorNoToken": { "message": "Sem token. Navega pelo Wallapop." },
+  "errorProfileFailed": { "message": "Nao foi possivel obter o perfil." },
+  "errorPercentInvalid": { "message": "Percentagem invalida" },
+  "errorInvalidItemId": { "message": "ID de artigo invalido" },
+  "errorCooldown": {
+    "message": "Espera $SECONDS$s antes de republicar",
+    "placeholders": { "SECONDS": { "content": "$1" } }
   },
-  "labelMinimize": { "message": "Minimizar" },
-  "labelConnectionStatus": { "message": "Estado da conexao" },
-  "cooldownWait": {
-    "message": "Espera $TIME$",
-    "placeholders": { "TIME": { "content": "$1" } }
-  },
-  "autoRepublishEnabled": {
-    "message": "Auto-republicacao a cada $HOURS$h ativada",
-    "placeholders": { "HOURS": { "content": "$1" } }
-  },
-  "autoRepublishDisabled": { "message": "Auto-republicacao desativada" },
-  "startingRepublish": { "message": "A iniciar republicacao..." }
+  "errorOperationInProgress": { "message": "Operacao em curso" },
+  "errorTokenExpired": { "message": "Token expirado. Navega pelo Wallapop" },
+  "errorNoItemsSelected": { "message": "Nenhum artigo selecionado" }
 }

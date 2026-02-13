@@ -1,66 +1,81 @@
 /**
- * Popup Script - Wallapop Tools v3.0
+ * Popup Script - Wallapop Tools v5.0
  *
- * Dashboard with stats, activity log, auto-republish toggle, price controls.
- * Fully internationalized via I18nRuntime (runtime locale loading).
+ * Clean, focused popup: republish, auto-republish, product list
+ * with stale indicators + inline price edit, batch price adjust.
  */
 
 (() => {
   'use strict';
 
-  // --- Shorthand for I18nRuntime.getMessage ---
   const t = (key, subs) => I18nRuntime.getMessage(key, subs);
-
-  // --- DOM refs ---
   const $ = (id) => document.getElementById(id);
+
+  // DOM refs
   const statusDot = $('status-dot');
   const statusLabel = $('status-label');
   const statItems = $('stat-items');
   const statLastRepublish = $('stat-last-republish');
   const statRepublishes = $('stat-republishes');
   const btnRepublish = $('btn-republish');
-  const autoToggle = $('auto-republish-toggle');
-  const autoInterval = $('auto-republish-interval');
   const progressSection = $('progress-section');
   const progressFill = $('progress-fill');
   const progressText = $('progress-text');
+  const autoToggle = $('auto-republish-toggle');
+  const autoInterval = $('auto-republish-interval');
+  const selectAllCheckbox = $('select-all');
+  const selectAllText = $('select-all-text');
+  const staleSummary = $('stale-summary');
+  const productsList = $('products-list');
+  const productsEmpty = $('products-empty');
+  const pricePercent = $('price-percent');
+  const btnMinus = $('price-minus');
+  const btnPlus = $('price-plus');
+  const btnLower = $('btn-lower');
+  const btnRaise = $('btn-raise');
+  const btnRepublishSelected = $('btn-republish-selected');
+  const btnExportCSV = $('btn-export-csv');
   const activityToggle = $('activity-toggle');
   const activityArrow = $('activity-arrow');
   const activityList = $('activity-list');
   const languageSelect = $('language-select');
 
-  // Price controls
-  const pricePercentInput = $('popup-price-percent');
-  const btnPriceMinus = $('popup-price-minus');
-  const btnPricePlus = $('popup-price-plus');
-  const btnPriceLower = $('popup-price-lower');
-  const btnPriceRaise = $('popup-price-raise');
+  // State
+  let items = [];
 
-  // --- i18n hydration ---
+  // ===== i18n =====
+
   function hydrateI18n() {
     document.querySelectorAll('[data-i18n]').forEach((el) => {
       const key = el.getAttribute('data-i18n');
       const msg = t(key);
       if (msg && msg !== key) el.textContent = msg;
     });
+    document.querySelectorAll('[data-i18n-placeholder]').forEach((el) => {
+      const key = el.getAttribute('data-i18n-placeholder');
+      const msg = t(key);
+      if (msg && msg !== key) el.placeholder = msg;
+    });
   }
 
-  // --- Init ---
+  // ===== Init =====
+
   document.addEventListener('DOMContentLoaded', async () => {
-    // Load preferred language first, then hydrate
-    const locale = await loadLanguageSetting();
+    const locale = await loadLanguage();
     await I18nRuntime.loadLocale(locale);
     hydrateI18n();
 
     await refreshStatus();
     await loadAutoRepublish();
     await loadStats();
+    await loadProducts();
     await loadActivityLog();
-    setupButtons();
+    setupListeners();
     listenForProgress();
   });
 
-  // --- Status ---
+  // ===== Status =====
+
   async function refreshStatus() {
     try {
       const status = await sendMessage({ type: 'GET_STATUS' });
@@ -86,41 +101,43 @@
       }
 
       if (status.operationInProgress) {
-        btnRepublish.disabled = true;
-        setPriceButtonsDisabled(true);
+        setAllButtonsDisabled(true);
       }
-    } catch (err) {
+    } catch {
       setDisconnected(t('statusError'));
     }
   }
 
   function setConnected(itemCount) {
-    statusDot.className = 'popup-header-dot connected';
-    const suffix = itemCount > 0 ? ` \u00B7 ${itemCount} ${t('labelProducts').toLowerCase()}` : '';
+    statusDot.className = 'status-dot connected';
+    const suffix = itemCount > 0 ? ` · ${itemCount} ${t('labelProducts').toLowerCase()}` : '';
     statusLabel.textContent = t('statusConnected') + suffix;
     btnRepublish.disabled = false;
-    setPriceButtonsDisabled(false);
+    btnLower.disabled = false;
+    btnRaise.disabled = false;
+    btnRepublishSelected.disabled = false;
   }
 
   function setDisconnected(msg) {
-    statusDot.className = 'popup-header-dot disconnected';
+    statusDot.className = 'status-dot disconnected';
     statusLabel.textContent = msg;
-    btnRepublish.disabled = true;
-    setPriceButtonsDisabled(true);
+    setAllButtonsDisabled(true);
   }
 
-  // --- Price button helpers ---
-  function setPriceButtonsDisabled(disabled) {
-    if (btnPriceLower) btnPriceLower.disabled = disabled;
-    if (btnPriceRaise) btnPriceRaise.disabled = disabled;
+  function setAllButtonsDisabled(disabled) {
+    btnRepublish.disabled = disabled;
+    btnLower.disabled = disabled;
+    btnRaise.disabled = disabled;
+    btnRepublishSelected.disabled = disabled;
   }
 
-  // --- Cooldown ---
+  // ===== Cooldown =====
+
   let cooldownTimer = null;
 
   function setCooldown(seconds) {
     btnRepublish.disabled = true;
-    btnRepublish.classList.add('popup-btn-cooldown', 'active');
+    btnRepublish.classList.add('btn-cooldown', 'active');
     updateCooldownText(seconds);
 
     clearInterval(cooldownTimer);
@@ -129,7 +146,7 @@
       remaining--;
       if (remaining <= 0) {
         clearInterval(cooldownTimer);
-        btnRepublish.classList.remove('popup-btn-cooldown', 'active');
+        btnRepublish.classList.remove('btn-cooldown', 'active');
         btnRepublish.disabled = false;
         btnRepublish.removeAttribute('data-cooldown');
         return;
@@ -145,94 +162,217 @@
     btnRepublish.setAttribute('data-cooldown', t('cooldownWait', [timeStr]));
   }
 
-  // --- Buttons ---
-  function setupButtons() {
+  // ===== Products =====
+
+  async function loadProducts() {
+    const resp = await sendMessage({ type: 'LOAD_ITEMS' });
+    if (resp?.error) {
+      productsEmpty.textContent = resp.error;
+      return;
+    }
+
+    if (!resp?.items?.length) {
+      productsEmpty.textContent = t('statusDisconnected');
+      return;
+    }
+
+    items = resp.items.map((item) => ({ ...item, selected: true }));
+    renderProducts();
+  }
+
+  function renderProducts() {
+    productsList.innerHTML = '';
+
+    if (items.length === 0) {
+      productsList.appendChild(productsEmpty);
+      return;
+    }
+
+    const staleCount = items.filter((i) => i.daysListed > 30).length;
+    if (staleCount > 0) {
+      staleSummary.textContent = t('labelStaleCount', [String(staleCount)]);
+    } else {
+      staleSummary.textContent = '';
+    }
+
+    selectAllText.textContent = t('labelSelectAll', [String(items.length)]);
+
+    for (const item of items) {
+      const row = document.createElement('div');
+      row.className = 'product-row';
+
+      // Checkbox
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = item.selected;
+      cb.addEventListener('change', () => {
+        item.selected = cb.checked;
+        updateSelectAll();
+      });
+
+      // Days badge
+      const days = document.createElement('span');
+      const d = item.daysListed;
+      days.className = 'product-days ' + (d > 30 ? 'stale' : d > 7 ? 'aging' : 'fresh');
+      days.textContent = d != null ? d + 'd' : '-';
+      days.title = d != null ? d + ' ' + t('labelDaysListed') : '';
+
+      // Info
+      const info = document.createElement('div');
+      info.className = 'product-info';
+      const title = document.createElement('div');
+      title.className = 'product-title';
+      title.textContent = item.title;
+      title.title = item.title;
+      info.appendChild(title);
+      if (item.category) {
+        const cat = document.createElement('div');
+        cat.className = 'product-category';
+        cat.textContent = item.category;
+        info.appendChild(cat);
+      }
+
+      // Price group
+      const priceGroup = document.createElement('div');
+      priceGroup.className = 'product-price-group';
+
+      const priceInput = document.createElement('input');
+      priceInput.type = 'number';
+      priceInput.className = 'product-price-input';
+      priceInput.value = String(item.price);
+      priceInput.step = '0.5';
+      priceInput.min = '0';
+
+      const currency = document.createElement('span');
+      currency.className = 'product-price-currency';
+      currency.textContent = '\u20AC';
+
+      const applyBtn = document.createElement('button');
+      applyBtn.className = 'product-price-btn';
+      applyBtn.textContent = '\u2713';
+      applyBtn.title = t('btnApplyPrice');
+      applyBtn.addEventListener('click', async () => {
+        const newPrice = parseFloat(priceInput.value);
+        if (!newPrice || newPrice <= 0) return;
+        applyBtn.disabled = true;
+        applyBtn.textContent = '...';
+        const resp = await sendMessage({ type: 'UPDATE_ITEM_PRICE', itemId: item.id, newPrice });
+        if (resp?.success) {
+          item.price = newPrice;
+          statusLabel.textContent = t('toastPriceApplied', [item.title.slice(0, 20), String(newPrice)]);
+        } else {
+          statusLabel.textContent = resp?.error || 'Error';
+        }
+        applyBtn.textContent = '\u2713';
+        applyBtn.disabled = false;
+      });
+
+      priceGroup.appendChild(priceInput);
+      priceGroup.appendChild(currency);
+      priceGroup.appendChild(applyBtn);
+
+      row.appendChild(cb);
+      row.appendChild(days);
+      row.appendChild(info);
+      row.appendChild(priceGroup);
+      productsList.appendChild(row);
+    }
+  }
+
+  function updateSelectAll() {
+    const allSelected = items.every((i) => i.selected);
+    selectAllCheckbox.checked = allSelected;
+  }
+
+  function getSelectedItems() {
+    return items.filter((i) => i.selected);
+  }
+
+  // ===== Listeners =====
+
+  function setupListeners() {
+    // Republish all
     btnRepublish.addEventListener('click', async () => {
-      btnRepublish.disabled = true;
-      showProgress(0, 1, t('progressStarting'));
+      setAllButtonsDisabled(true);
+      showProgress(0, 1, t('startingRepublish'));
       const resp = await sendMessage({ type: 'REPUBLISH_ALL' });
       if (resp?.error) {
         hideProgress();
         statusLabel.textContent = resp.error;
-        btnRepublish.disabled = false;
+        setAllButtonsDisabled(false);
       }
     });
 
-    // Activity log toggle
+    // Select all
+    selectAllCheckbox.addEventListener('change', () => {
+      const checked = selectAllCheckbox.checked;
+      items.forEach((i) => { i.selected = checked; });
+      productsList.querySelectorAll('input[type="checkbox"]').forEach((cb) => { cb.checked = checked; });
+    });
+
+    // Price stepper
+    btnMinus.addEventListener('click', () => {
+      let val = parseInt(pricePercent.value, 10) || 0;
+      pricePercent.value = Math.max(1, val - 1);
+    });
+
+    btnPlus.addEventListener('click', () => {
+      let val = parseInt(pricePercent.value, 10) || 0;
+      pricePercent.value = Math.min(50, val + 1);
+    });
+
+    // Price adjust
+    btnLower.addEventListener('click', () => doAdjustPrices(-1));
+    btnRaise.addEventListener('click', () => doAdjustPrices(1));
+
+    // Republish selected
+    btnRepublishSelected.addEventListener('click', async () => {
+      const selected = getSelectedItems();
+      if (selected.length === 0) return;
+
+      setAllButtonsDisabled(true);
+      showProgress(0, 1, t('startingRepublish'));
+      const resp = await sendMessage({
+        type: 'REPUBLISH_SELECTED',
+        itemIds: selected.map((i) => i.id),
+      });
+      if (resp?.error) {
+        hideProgress();
+        statusLabel.textContent = resp.error;
+        setAllButtonsDisabled(false);
+      }
+    });
+
+    // Export CSV
+    btnExportCSV.addEventListener('click', async () => {
+      btnExportCSV.disabled = true;
+      const resp = await sendMessage({ type: 'EXPORT_CSV' });
+      btnExportCSV.disabled = false;
+
+      if (resp?.csv) {
+        const blob = new Blob([resp.csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `wallapop-items-${new Date().toISOString().slice(0, 10)}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+        statusLabel.textContent = t('toastCSVExported');
+      } else if (resp?.error) {
+        statusLabel.textContent = resp.error;
+      }
+    });
+
+    // Activity toggle
     activityToggle.addEventListener('click', () => {
       const isHidden = activityList.style.display === 'none';
       activityList.style.display = isHidden ? 'block' : 'none';
       activityArrow.classList.toggle('open', isHidden);
     });
 
-    // Language selector — reload locale + re-hydrate on change
-    languageSelect.addEventListener('change', async () => {
-      const newLocale = languageSelect.value;
-      chrome.storage.local.set({ preferred_language: newLocale });
-      await I18nRuntime.loadLocale(newLocale);
-      hydrateI18n();
-      // Re-render dynamic content
-      await refreshStatus();
-      await loadStats();
-      // Clear and reload activity
-      while (activityList.firstChild) activityList.firstChild.remove();
-      await loadActivityLog();
-    });
-
-    // Price stepper controls
-    if (btnPriceMinus && btnPricePlus && pricePercentInput) {
-      btnPriceMinus.addEventListener('click', () => {
-        let val = parseInt(pricePercentInput.value, 10) || 0;
-        val = Math.max(1, val - 1);
-        pricePercentInput.value = val;
-      });
-
-      btnPricePlus.addEventListener('click', () => {
-        let val = parseInt(pricePercentInput.value, 10) || 0;
-        val = Math.min(50, val + 1);
-        pricePercentInput.value = val;
-      });
-    }
-
-    // Price action buttons
-    if (btnPriceLower) {
-      btnPriceLower.addEventListener('click', () => doAdjustPrices(-1));
-    }
-    if (btnPriceRaise) {
-      btnPriceRaise.addEventListener('click', () => doAdjustPrices(1));
-    }
-  }
-
-  // --- Price adjustment ---
-  async function doAdjustPrices(direction) {
-    const rawPct = parseInt(pricePercentInput.value, 10) || 0;
-    if (rawPct === 0) return;
-
-    const pct = direction < 0 ? -Math.abs(rawPct) : Math.abs(rawPct);
-
-    setPriceButtonsDisabled(true);
-    btnRepublish.disabled = true;
-    showProgress(0, 1, t('progressAdjusting'));
-
-    const resp = await sendMessage({ type: 'ADJUST_PRICES', percent: pct });
-    if (resp?.error) {
-      hideProgress();
-      statusLabel.textContent = resp.error;
-      setPriceButtonsDisabled(false);
-      btnRepublish.disabled = false;
-    }
-  }
-
-  // --- Auto-republish ---
-  async function loadAutoRepublish() {
-    const resp = await sendMessage({ type: 'GET_AUTO_REPUBLISH_STATUS' });
-    if (!resp) return;
-
-    if (resp.autoRepublish?.enabled) {
-      autoToggle.checked = true;
-      autoInterval.value = String(resp.autoRepublish.intervalHours || 12);
-    }
-
+    // Auto-republish
     autoToggle.addEventListener('change', () => {
       sendMessage({
         type: 'SET_AUTO_REPUBLISH',
@@ -250,46 +390,105 @@
         });
       }
     });
+
+    // Language
+    languageSelect.addEventListener('change', async () => {
+      const newLocale = languageSelect.value;
+      chrome.storage.local.set({ preferred_language: newLocale });
+      await I18nRuntime.loadLocale(newLocale);
+      hydrateI18n();
+      await refreshStatus();
+      await loadStats();
+      renderProducts();
+      activityList.innerHTML = '';
+      await loadActivityLog();
+    });
   }
 
-  // --- Stats ---
+  // ===== Price adjust =====
+
+  async function doAdjustPrices(direction) {
+    const rawPct = parseInt(pricePercent.value, 10) || 0;
+    if (rawPct === 0) return;
+
+    const pct = direction < 0 ? -Math.abs(rawPct) : Math.abs(rawPct);
+    const selected = getSelectedItems();
+
+    setAllButtonsDisabled(true);
+    showProgress(0, 1, t('progressAdjusting'));
+
+    let resp;
+    if (selected.length > 0 && selected.length < items.length) {
+      resp = await sendMessage({
+        type: 'ADJUST_SELECTED_PRICES',
+        percent: pct,
+        itemIds: selected.map((i) => i.id),
+      });
+    } else {
+      resp = await sendMessage({ type: 'ADJUST_PRICES', percent: pct });
+    }
+
+    if (resp?.error) {
+      hideProgress();
+      statusLabel.textContent = resp.error;
+      setAllButtonsDisabled(false);
+    }
+  }
+
+  // ===== Auto-republish =====
+
+  async function loadAutoRepublish() {
+    const resp = await sendMessage({ type: 'GET_AUTO_REPUBLISH_STATUS' });
+    if (!resp) return;
+
+    if (resp.autoRepublish?.enabled) {
+      autoToggle.checked = true;
+      autoInterval.value = String(resp.autoRepublish.intervalHours || 12);
+    }
+  }
+
+  // ===== Stats =====
+
   async function loadStats() {
     const resp = await sendMessage({ type: 'GET_STATS' });
     if (!resp?.stats) return;
-
     statRepublishes.textContent = resp.stats.totalRepublishes || 0;
   }
 
-  // --- Activity Log ---
+  // ===== Activity Log =====
+
   async function loadActivityLog() {
     const resp = await sendMessage({ type: 'GET_ACTIVITY_LOG', limit: 5 });
     if (!resp?.log || resp.log.length === 0) {
-      const noActivity = document.createElement('div');
-      noActivity.className = 'popup-no-activity';
-      noActivity.textContent = t('labelNoActivity');
-      activityList.appendChild(noActivity);
+      const empty = document.createElement('div');
+      empty.className = 'no-activity';
+      empty.textContent = t('labelNoActivity');
+      activityList.appendChild(empty);
       return;
     }
 
     for (const entry of resp.log) {
       const item = document.createElement('div');
-      item.className = 'popup-activity-item';
+      item.className = 'activity-item';
 
       const icon = document.createElement('span');
-      icon.className = 'popup-activity-icon ' + (entry.failed > 0 ? 'error' : 'success');
+      icon.className = 'activity-icon ' + (entry.failed > 0 ? 'error' : 'success');
       icon.textContent = entry.failed > 0 ? '\u2717' : '\u2713';
 
       const text = document.createElement('span');
-      text.className = 'popup-activity-text';
-      if (entry.type === 'republish') {
+      text.className = 'activity-text';
+
+      if (entry.type === 'republish' || entry.type === 'republish_selected') {
         text.textContent = t('activityRepublish', [String(entry.success)]);
       } else if (entry.type === 'prices') {
         const pctStr = (entry.percent > 0 ? '+' : '') + entry.percent;
         text.textContent = t('activityPrices', [pctStr, String(entry.total)]);
+      } else if (entry.type === 'price_exact') {
+        text.textContent = t('toastPriceApplied', ['', String(entry.newPrice)]);
       }
 
       const time = document.createElement('span');
-      time.className = 'popup-activity-time';
+      time.className = 'activity-time';
       time.textContent = timeAgo(new Date(entry.timestamp).toISOString());
 
       item.appendChild(icon);
@@ -299,14 +498,14 @@
     }
   }
 
-  // --- Language ---
-  async function loadLanguageSetting() {
+  // ===== Language =====
+
+  async function loadLanguage() {
     const data = await chrome.storage.local.get(['preferred_language']);
     if (data.preferred_language) {
       languageSelect.value = data.preferred_language;
       return data.preferred_language;
     }
-    // Try to detect from browser locale
     const uiLang = chrome.i18n.getUILanguage();
     let locale = 'en';
     if (uiLang.startsWith('es')) locale = 'es';
@@ -317,10 +516,12 @@
     return locale;
   }
 
-  // --- Progress ---
+  // ===== Progress =====
+
   function listenForProgress() {
     chrome.runtime.onMessage.addListener((msg) => {
       if (msg.type === 'PROGRESS') {
+        statusDot.className = 'status-dot working';
         if (msg.loading) {
           showProgress(0, 1, t('statusLoadingProducts'));
         } else {
@@ -330,6 +531,7 @@
           showProgress(msg.current, msg.total, `${msg.current}/${msg.total} ${label}`);
         }
       }
+
       if (msg.type === 'OPERATION_COMPLETE') {
         hideProgress();
         let resultMsg;
@@ -339,11 +541,14 @@
           resultMsg = t('toastPricesUpdated', [String(msg.success), String(msg.failed)]);
         }
         statusLabel.textContent = resultMsg;
-        btnRepublish.disabled = false;
-        setPriceButtonsDisabled(false);
+        statusDot.className = 'status-dot connected';
+        setAllButtonsDisabled(false);
+
+        // Refresh data
         refreshStatus();
         loadStats();
-        while (activityList.firstChild) activityList.firstChild.remove();
+        loadProducts();
+        activityList.innerHTML = '';
         loadActivityLog();
       }
     });
@@ -362,15 +567,13 @@
     progressText.textContent = '';
   }
 
-  // --- Helpers ---
+  // ===== Helpers =====
+
   function sendMessage(msg) {
     return new Promise((resolve) => {
       chrome.runtime.sendMessage(msg, (response) => {
-        if (chrome.runtime.lastError) {
-          resolve(null);
-        } else {
-          resolve(response);
-        }
+        if (chrome.runtime.lastError) resolve(null);
+        else resolve(response);
       });
     });
   }
