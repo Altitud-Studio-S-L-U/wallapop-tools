@@ -34,10 +34,10 @@ class ReleasePackageTests(unittest.TestCase):
         output = self.root / "release.zip"
         result = RELEASE.build_archive(self.root, output)
         self.assertTrue(result["source_matches"])
-        self.assertEqual(result["version"], "5.0.2")
+        self.assertEqual(result["version"], "5.0.3")
         with zipfile.ZipFile(output) as archive:
             self.assertEqual(archive.namelist(), sorted(RELEASE.EXTENSION_FILES))
-            self.assertEqual(json.loads(archive.read("manifest.json"))["version"], "5.0.2")
+            self.assertEqual(json.loads(archive.read("manifest.json"))["version"], "5.0.3")
 
     def test_repeated_builds_are_byte_identical(self):
         first = self.root / "first.zip"

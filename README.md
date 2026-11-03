@@ -69,6 +69,12 @@ Operations apply requests **one item at a time**. Review the reported success an
 
 If authentication expires, browse Wallapop again to capture a fresh token. After reloading the extension or restarting the browser, reconnect the session before relying on scheduled actions.
 
+### CSV format
+
+The export is intended for spreadsheet inspection. Every column escapes commas, double quotes and CR/LF; embedded double quotes are doubled. Numeric prices and day counts, and boolean shipping values, keep their existing serialization.
+
+Formula-like text beginning with `=`, `+`, `-` or `@` (including full-width forms and preceding whitespace/control characters), and text starting with a control character, receive exactly one leading tab inside a quoted CSV field. This follows [OWASP's Excel-oriented mitigation](https://community.owasp.org/attacks/CSV_Injection). The original text follows that tab unchanged. The tab is part of the exported data, so programmatic consumers must account for it; this CSV is not an exact text backup. Other spreadsheet programs, import settings and save/reopen workflows can interpret values differently. No universal formula-safety guarantee is implied.
+
 ## Data and permissions
 
 The interceptor observes authentication headers in requests made by the signed-in Wallapop page. A content bridge relays the token to the extension's service worker, which uses it for API calls. The API client constructs HMAC-SHA256 signatures for authenticated requests.
@@ -140,7 +146,7 @@ The Vitest suite includes tests that execute the real service-worker source in a
 
 ### Isolated Chromium integration check
 
-`scripts/check-browser.mjs` loads the actual extension in a disposable Chromium profile. It exercises the popup, empty-selection protection, visible operation errors, installed version, token interceptor and content bridge, account changes, price updates, shared operation lock, and service-worker stop/wake. All HTTP requests are fulfilled with synthetic fixtures or blocked; DNS resolution is disabled. This checks real browser integration against controlled API responses, not compatibility with live Wallapop endpoints.
+`scripts/check-browser.mjs` loads the actual extension in a disposable Chromium profile. It exercises the popup, empty-selection protection, visible operation errors, installed version, token interceptor and content bridge, account changes, price updates, shared operation lock, service-worker stop/wake, and downloaded CSV bytes. All HTTP requests are fulfilled with synthetic fixtures or blocked; DNS resolution is disabled. This checks real browser integration against controlled API responses, not compatibility with live Wallapop endpoints or spreadsheet applications.
 
 Supply Playwright from a separate tooling installation through `PLAYWRIGHT_MODULE_PATH`. Install its supported Chromium browser there; `CHROMIUM_EXECUTABLE` can select an existing Chromium executable. [Playwright's extension documentation](https://playwright.dev/docs/chrome-extensions) explains why its Chromium distribution is required instead of branded Chrome or Edge. Extract the release ZIP to a temporary directory, then run:
 
@@ -158,7 +164,7 @@ Use Python 3.11 or newer; the packaging script needs only the standard library:
 ```sh
 python -m unittest discover -s tests -p test_release_package.py
 python scripts/package-release.py
-python scripts/package-release.py --verify dist/wallapop-tools-v5.0.2.zip
+python scripts/package-release.py --verify dist/wallapop-tools-v5.0.3.zip
 ```
 
 The output defaults to `dist/wallapop-tools-v<manifest-version>.zip`; use `--output /path/to/release.zip` to choose another location. The script includes only its explicit list of runtime files and the license. It excludes development dependencies, tests, Git, logs and environment files, fixes ZIP timestamps and permissions, and sorts entries. Repeated builds from the same file bytes and Python/zlib toolchain produce identical archives. Verification checks the exact file list, CRCs, manifest and byte-for-byte agreement with the checkout, then prints the archive SHA-256. Packaging does not publish a GitHub release.

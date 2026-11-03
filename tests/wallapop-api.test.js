@@ -423,6 +423,52 @@ describe('WallapopAPI', () => {
       expect(csv).toContain('"iPhone 15, 256GB"');
     });
 
+    it('quotes CSV separators, quotes and CR/LF in every text column including URLs', () => {
+      const csv = WallapopAPI.exportItemsToCSV([{
+        id: 'fixture', title: 'first\rsecond', price: 12.5,
+        category_name: 'category,one', condition: '"good"\ncondition',
+        web_slug: 'slug,"quote"\r\nline', shipping: { user_allows_shipping: true },
+      }]);
+      expect(csv).toBe('title,price,category,condition,days_listed,shipping_enabled,url\n'
+        + '"first\rsecond",12.5,"category,one","""good""\ncondition",,true,'
+        + '"https://es.wallapop.com/item/slug,""quote""\r\nline"');
+    });
+
+    it.each([
+      '=1+1', '+1+1', '-1+1', '@SUM(1)',
+      '\tplain text', '\rplain text', '\nplain text', '\u0000plain text',
+      ' \t=1+1', '\uFEFF=1+1', '＝1+1', '＋1+1', '－1+1', '＠SUM(1)',
+    ])('prefixes formula-like or control-leading text with one quoted tab: %j', (title) => {
+      const csv = WallapopAPI.exportItemsToCSV([{ id: 'fixture', title, price: 1 }]);
+      expect(csv).toBe('title,price,category,condition,days_listed,shipping_enabled,url\n'
+        + `"\t${title}",1,,,,false,https://es.wallapop.com/item/fixture`);
+    });
+
+    it('applies spreadsheet text handling to category, condition and non-boolean source data', () => {
+      const csv = WallapopAPI.exportItemsToCSV([{
+        id: 'fixture', title: 'plain', price: 1, category_name: '+category',
+        condition: '@condition', shipping: { user_allows_shipping: '=1+1' },
+      }]);
+      expect(csv).toBe('title,price,category,condition,days_listed,shipping_enabled,url\n'
+        + 'plain,1,"\t+category","\t@condition",,"\t=1+1",https://es.wallapop.com/item/fixture');
+    });
+
+    it('preserves numeric and boolean serialization and ordinary or apostrophe-leading text', () => {
+      vi.useFakeTimers();
+      try {
+        vi.setSystemTime(new Date('2026-01-01T00:00:00Z'));
+        const csv = WallapopAPI.exportItemsToCSV([{
+          id: 'fixture', title: "'=1+1", sale_price: -12.5, category_name: '0',
+          condition: ' good ', creation_date: '2026-01-02T00:00:00Z',
+          shipping: { user_allows_shipping: false },
+        }]);
+        expect(csv).toBe('title,price,category,condition,days_listed,shipping_enabled,url\n'
+          + "'=1+1,-12.5,0, good ,-1,false,https://es.wallapop.com/item/fixture");
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it('should handle empty items gracefully', () => {
       const items = [{}];
       const csv = WallapopAPI.exportItemsToCSV(items);
