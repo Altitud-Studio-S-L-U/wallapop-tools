@@ -265,15 +265,13 @@ const WallapopAPI = (() => {
   function exportItemsToCSV(items) {
     const header = 'title,price,category,condition,days_listed,shipping_enabled,url';
     const rows = items.map((item) => {
-      const title = csvEscape(getItemTitle(item));
+      const title = getItemTitle(item);
       const price = getItemPrice(item);
 
       const lastTax = Array.isArray(item.taxonomy) ? item.taxonomy[item.taxonomy.length - 1] : null;
-      const category = csvEscape(lastTax?.name || item.category_name || '');
+      const category = lastTax?.name || item.category_name || '';
 
-      const condition = csvEscape(
-        item.type_attributes?.condition?.value || item.condition || ''
-      );
+      const condition = item.type_attributes?.condition?.value || item.condition || '';
 
       const creationDate = item.creation_date || item.modified_date || item.publish_date;
       const daysListed = creationDate
@@ -287,7 +285,8 @@ const WallapopAPI = (() => {
         ? `https://es.wallapop.com/item/${item.web_slug}`
         : (item.id ? `https://es.wallapop.com/item/${item.id}` : '');
 
-      return `${title},${price},${category},${condition},${daysListed},${shippingEnabled},${url}`;
+      return [title, price, category, condition, daysListed, shippingEnabled, url]
+        .map(csvEscape).join(',');
     });
 
     return rows.length > 0 ? header + '\n' + rows.join('\n') : header;
@@ -295,10 +294,18 @@ const WallapopAPI = (() => {
 
   function csvEscape(value) {
     const str = String(value ?? '');
-    if (str.includes(',') || str.includes('"') || str.includes('\n')) {
-      return '"' + str.replace(/"/g, '""') + '"';
+    const isText = typeof value !== 'number' && typeof value !== 'boolean';
+    const needsTextPrefix = isText && (
+      /^[\x00-\x1f\x7f-\x9f]/u.test(str)
+      || /^[\s\x00-\x1f\x7f-\x9f]*[=+\-@＝＋－＠]/u.test(str)
+    );
+    // A quoted TAB keeps formula-like text literal in Excel without changing numeric cells.
+    // It remains part of the exported value; the README documents this import trade-off.
+    const text = needsTextPrefix ? '\t' + str : str;
+    if (needsTextPrefix || /[,"\r\n]/u.test(text)) {
+      return '"' + text.replace(/"/g, '""') + '"';
     }
-    return str;
+    return text;
   }
 
   // --- Competition Search (public API) ---

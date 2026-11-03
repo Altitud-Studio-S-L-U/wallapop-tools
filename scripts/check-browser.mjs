@@ -260,6 +260,24 @@ try {
   await cdp.detach();
   checks.push('a stopped MV3 worker wakes and re-verifies /me rather than trusting its saved user ID');
 
+  Object.assign(accounts.get(tokenB).item, {
+    title: '=1+1',
+    taxonomy: [{ id: 1, name: '+category' }],
+    condition: 'Used\rwith "quotes"',
+    web_slug: 'fixture,slug\r\n"quoted"',
+  });
+  const exportItems = await message(popup, { type: 'LOAD_ITEMS' });
+  assert.equal(exportItems.items[0].title, '=1+1');
+  const pendingDownload = popup.waitForEvent('download');
+  await popup.locator('#btn-export-csv').click();
+  const download = await pendingDownload;
+  assert.match(download.suggestedFilename(), /^wallapop-items-\d{4}-\d{2}-\d{2}\.csv$/u);
+  assert.equal(await readFile(await download.path(), 'utf8'),
+    'title,price,category,condition,days_listed,shipping_enabled,url\n'
+      + '"\t=1+1",220,"\t+category","Used\rwith ""quotes""",,false,'
+      + '"https://es.wallapop.com/item/fixture,slug\r\n""quoted"""');
+  checks.push('the popup downloads CSV with formula-text prefixes and quoted CR, quotes and URL separators');
+
   assert.deepEqual(unexpectedRequests, []);
   console.log(JSON.stringify({
     browser: context.browser().version(),
