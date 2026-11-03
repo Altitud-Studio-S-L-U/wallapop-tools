@@ -91,5 +91,7 @@
   },
   "errorOperationInProgress": { "message": "Operazione in corso" },
   "errorTokenExpired": { "message": "Token scaduto. Naviga su Wallapop" },
+  "errorSessionChanged": { "message": "La sessione è cambiata. L’operazione è stata interrotta; le richieste già inviate potrebbero essere state completate." },
+  "errorPriceInvalid": { "message": "Inserisci un prezzo finito maggiore di zero." },
   "errorNoItemsSelected": { "message": "Nessun articolo selezionato" }
 }
