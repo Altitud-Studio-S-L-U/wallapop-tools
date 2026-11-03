@@ -71,8 +71,10 @@ const WallapopAPI = (() => {
       headers['DeviceID'] = deviceId;
     }
 
+    const { beforeRequest, ...requestOptions } = options;
+    if (beforeRequest) await beforeRequest();
     const response = await fetch(url, {
-      ...options,
+      ...requestOptions,
       method,
       headers: { ...headers, ...options.headers },
     });
@@ -227,10 +229,11 @@ const WallapopAPI = (() => {
     return allItems;
   }
 
-  async function republishItem(token, deviceId, itemId, hostname) {
+  async function republishItem(token, deviceId, itemId, hostname, beforeRequest) {
     return apiCall(`/api/v3/items/${itemId}/reactivate`, token, deviceId, {
       method: 'PUT',
       ...(hostname ? { hostname } : {}),
+      ...(beforeRequest ? { beforeRequest } : {}),
     });
   }
 
@@ -239,7 +242,7 @@ const WallapopAPI = (() => {
     return apiCall(`/api/v3/items/${itemId}`, token, deviceId, opts);
   }
 
-  async function updateItemPrice(token, deviceId, itemId, newPrice, hostname) {
+  async function updateItemPrice(token, deviceId, itemId, newPrice, hostname, beforeRequest) {
     const opts = hostname ? { hostname } : {};
     const item = await getItemDetails(token, deviceId, itemId, hostname);
     const body = mapGetToPutBody(item, newPrice);
@@ -249,6 +252,7 @@ const WallapopAPI = (() => {
         method: 'PUT',
         body: JSON.stringify(body),
         ...opts,
+        ...(beforeRequest ? { beforeRequest } : {}),
       });
     } catch (err) {
       console.error('[WallapopAPI] PUT failed:', err.message);

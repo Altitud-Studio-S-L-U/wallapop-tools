@@ -19,14 +19,18 @@ const COOLDOWN_MS = 5 * 60 * 1000;
 let _lastRepublishStart = 0;
 let _operationInProgress = false;
 let _cachedItems = null;
-let _cachedUserId = null;
+let _verifiedSession = null;
+let _sessionRevision = 0;
+let _itemsRevision = 0;
+let _sessionUpdates = Promise.resolve();
+let _sessionError = null;
 let _hostname = 'es.wallapop.com';
 
 // ============================================================
 // SESSION TOKEN HELPERS
 // ============================================================
 
-async function getSession() {
+async function readSession() {
   const data = await chrome.storage.session.get(['token', 'deviceId', 'userId', 'hostname']);
   return {
     token: data.token || null,
@@ -34,6 +38,52 @@ async function getSession() {
     userId: data.userId || null,
     hostname: data.hostname || _hostname,
   };
+}
+
+function queueSessionUpdate(action) {
+  const update = _sessionUpdates.then(action);
+  // The caller receives the failure; subsequent captures must still be usable.
+  _sessionUpdates = update.catch(() => {});
+  return update;
+}
+
+async function getSession() {
+  while (true) {
+    const pending = _sessionUpdates;
+    await pending;
+    if (_sessionError) throw _sessionError;
+    const revision = _sessionRevision;
+    const session = await readSession();
+    if (pending === _sessionUpdates && revision === _sessionRevision) {
+      return { ...session, revision };
+    }
+  }
+}
+
+function sessionChangedError() {
+  return new Error(chrome.i18n.getMessage('errorSessionChanged'));
+}
+
+function matchesSession(current, expected) {
+  return _sessionRevision === expected.revision && current.token === expected.token
+    && current.deviceId === expected.deviceId && current.hostname === expected.hostname;
+}
+
+async function assertCurrentSession(expected) {
+  const current = await getSession();
+  if (!matchesSession(current, expected)) throw sessionChangedError();
+}
+
+function updateForSession(expected, action) {
+  return queueSessionUpdate(async () => {
+    if (_sessionError || !matchesSession(await readSession(), expected)) throw sessionChangedError();
+    return action();
+  });
+}
+
+function invalidateItems() {
+  _cachedItems = null;
+  _itemsRevision++;
 }
 
 async function setSession(fields) {
@@ -74,24 +124,77 @@ async function ensureUserId() {
   const session = await getSession();
   if (!session.token) throw new Error(chrome.i18n.getMessage('errorNoToken'));
 
-  if (session.userId) {
-    _cachedUserId = session.userId;
-    return session;
+  if (_verifiedSession && matchesSession(_verifiedSession, session)) {
+    return { ...session, userId: _verifiedSession.userId };
   }
 
-  if (_cachedUserId) {
-    await setSession({ userId: _cachedUserId });
-    return { ...session, userId: _cachedUserId };
+  let profile;
+  try {
+    profile = await WallapopAPI.getMyProfile(session.token, session.deviceId);
+  } catch (error) {
+    await handleSessionError(error, session);
   }
-
-  const profile = await WallapopAPI.getMyProfile(session.token, session.deviceId);
   if (profile?.id) {
-    _cachedUserId = profile.id;
-    await setSession({ userId: profile.id });
+    await updateForSession(session, async () => {
+      await setSession({ userId: profile.id });
+      _verifiedSession = { ...session, userId: profile.id };
+    });
+    await assertCurrentSession(session);
     return { ...session, userId: profile.id };
   }
 
+  await assertCurrentSession(session);
   throw new Error(chrome.i18n.getMessage('errorProfileFailed'));
+}
+
+async function handleSessionError(error, session) {
+  if (error.message === 'TOKEN_EXPIRED') {
+    if (!await clearToken(session)) throw sessionChangedError();
+    throw new Error(chrome.i18n.getMessage('errorTokenExpired'));
+  }
+  await assertCurrentSession(session);
+  throw error;
+}
+
+async function captureSession(token, deviceId, hostname) {
+  let shouldLoad = false;
+  await queueSessionUpdate(async () => {
+    try {
+      const current = await readSession();
+      const nextDeviceId = deviceId || (current.token === token ? current.deviceId : null);
+      const changed = current.token !== token || current.deviceId !== nextDeviceId || current.hostname !== hostname;
+      shouldLoad = changed || !_verifiedSession;
+      if (changed) {
+        _sessionRevision++;
+        _verifiedSession = null;
+        invalidateItems();
+        await chrome.storage.local.remove(['wallapop_item_count', 'last_republish']);
+        updateBadge(0);
+      }
+      await setSession({ token, deviceId: nextDeviceId, hostname, ...(changed ? { userId: null } : {}) });
+      _hostname = hostname;
+      _sessionError = null;
+    } catch (error) {
+      _sessionError = new Error(chrome.i18n.getMessage('errorProfileFailed'));
+      _sessionRevision++;
+      _verifiedSession = null;
+      invalidateItems();
+      throw error;
+    }
+  });
+  if (shouldLoad) await loadAllItems();
+}
+
+function captureHostname(sender) {
+  try {
+    if (chrome.runtime.id && sender.id !== chrome.runtime.id) return null;
+    const url = new URL(sender.url);
+    const origins = ['https://es.wallapop.com', 'https://it.wallapop.com', 'https://fr.wallapop.com', 'https://pt.wallapop.com'];
+    if (!origins.includes(url.origin)) return null;
+    return url.hostname;
+  } catch {
+    return null;
+  }
 }
 
 // ============================================================
@@ -109,6 +212,14 @@ function validatePercent(value) {
 function validateItemId(id) {
   if (id == null || id === '') throw new Error(chrome.i18n.getMessage('errorInvalidItemId'));
   return String(id);
+}
+
+function validatePrice(value) {
+  const price = Math.round(Number(value) * 100) / 100;
+  if (!Number.isFinite(price) || price <= 0) {
+    throw new Error(chrome.i18n.getMessage('errorPriceInvalid'));
+  }
+  return price;
 }
 
 // ============================================================
@@ -186,16 +297,50 @@ function getDaysListed(trackingEntry) {
 // CORE OPERATIONS
 // ============================================================
 
-async function loadAllItems() {
-  const session = await ensureUserId();
-  const items = await WallapopAPI.getAllMyItems(session.token, session.deviceId, session.userId);
-  _cachedItems = items;
-
-  await chrome.storage.local.set({ wallapop_item_count: items.length });
-  updateBadge(items.length);
-  await updateItemTracking(items);
-
+async function loadAllItems(expectedSession) {
+  const session = expectedSession || await ensureUserId();
+  await assertCurrentSession(session);
+  const revision = _itemsRevision;
+  let items;
+  try {
+    items = await WallapopAPI.getAllMyItems(session.token, session.deviceId, session.userId);
+  } catch (error) {
+    await handleSessionError(error, session);
+  }
+  await updateForSession(session, async () => {
+    if (revision !== _itemsRevision) throw new Error(chrome.i18n.getMessage('errorOperationInProgress'));
+    _cachedItems = items;
+    await chrome.storage.local.set({ wallapop_item_count: items.length });
+    updateBadge(items.length);
+    await updateItemTracking(items);
+  });
+  await assertCurrentSession(session);
   return items;
+}
+
+async function getSelectedIds(session, itemIds) {
+  const ids = itemIds.map(validateItemId);
+  const items = _cachedItems || await loadAllItems(session);
+  await assertCurrentSession(session);
+  const available = new Set(items.map((item) => String(item.id)));
+  if (ids.some((id) => !available.has(id))) {
+    throw new Error(chrome.i18n.getMessage('errorInvalidItemId'));
+  }
+  return ids;
+}
+
+async function writeItemPrice(session, itemId, newPrice) {
+  await updateForSession(session, invalidateItems);
+  try {
+    await assertCurrentSession(session);
+    await WallapopAPI.updateItemPrice(session.token, session.deviceId, itemId, newPrice, session.hostname,
+      () => assertCurrentSession(session));
+    await assertCurrentSession(session);
+  } finally {
+    // A failed response can follow a successful remote write. Re-read the server
+    // before the next operation, and discard reads started during this write.
+    if (_sessionRevision === session.revision) invalidateItems();
+  }
 }
 
 async function republishAll(sendProgress) {
@@ -216,7 +361,7 @@ async function republishAll(sendProgress) {
     const session = await ensureUserId();
     let items = _cachedItems;
     if (!items) {
-      items = await loadAllItems();
+      items = await loadAllItems(session);
     }
 
     const total = items.length;
@@ -224,18 +369,21 @@ async function republishAll(sendProgress) {
     let failed = 0;
 
     for (let i = 0; i < items.length; i++) {
+      await assertCurrentSession(session);
       if (sendProgress) {
         sendProgress({ current: i + 1, total, success, failed });
       }
 
       try {
-        await WallapopAPI.republishItem(session.token, session.deviceId, items[i].id, session.hostname);
+        await WallapopAPI.republishItem(session.token, session.deviceId, items[i].id, session.hostname,
+          () => assertCurrentSession(session));
+        await assertCurrentSession(session);
         success++;
       } catch (err) {
         if (err.message === 'TOKEN_EXPIRED') {
-          await clearToken();
-          throw new Error(chrome.i18n.getMessage('errorTokenExpired'));
+          await handleSessionError(err, session);
         }
+        await assertCurrentSession(session);
         failed++;
       }
 
@@ -245,9 +393,11 @@ async function republishAll(sendProgress) {
     }
 
     const result = { total, success, failed, date: new Date().toISOString() };
-    await chrome.storage.local.set({ last_republish: result });
-    await logActivity({ type: 'republish', total, success, failed });
-    await updateRepublishStats(success, failed);
+    await updateForSession(session, async () => {
+      await chrome.storage.local.set({ last_republish: result });
+      await logActivity({ type: 'republish', total, success, failed });
+      await updateRepublishStats(success, failed);
+    });
 
     return result;
   } finally {
@@ -264,24 +414,27 @@ async function republishSelected(itemIds, sendProgress) {
 
   try {
     const session = await ensureUserId();
-    const validIds = itemIds.map(validateItemId);
+    const validIds = await getSelectedIds(session, itemIds);
     const total = validIds.length;
     let success = 0;
     let failed = 0;
 
     for (let i = 0; i < validIds.length; i++) {
+      await assertCurrentSession(session);
       if (sendProgress) {
         sendProgress({ current: i + 1, total, success, failed });
       }
 
       try {
-        await WallapopAPI.republishItem(session.token, session.deviceId, validIds[i], session.hostname);
+        await WallapopAPI.republishItem(session.token, session.deviceId, validIds[i], session.hostname,
+          () => assertCurrentSession(session));
+        await assertCurrentSession(session);
         success++;
       } catch (err) {
         if (err.message === 'TOKEN_EXPIRED') {
-          await clearToken();
-          throw new Error(chrome.i18n.getMessage('errorTokenExpired'));
+          await handleSessionError(err, session);
         }
+        await assertCurrentSession(session);
         failed++;
       }
 
@@ -291,8 +444,10 @@ async function republishSelected(itemIds, sendProgress) {
     }
 
     const result = { total, success, failed, date: new Date().toISOString() };
-    await logActivity({ type: 'republish_selected', total, success, failed });
-    await updateRepublishStats(success, failed);
+    await updateForSession(session, async () => {
+      await logActivity({ type: 'republish_selected', total, success, failed });
+      await updateRepublishStats(success, failed);
+    });
 
     return result;
   } finally {
@@ -313,11 +468,11 @@ async function adjustAllPrices(percentChange, sendProgress, itemIds) {
     let items = _cachedItems;
     if (!items) {
       if (sendProgress) sendProgress({ current: 0, total: 0, loading: true });
-      items = await loadAllItems();
+      items = await loadAllItems(session);
     }
 
     if (itemIds && Array.isArray(itemIds) && itemIds.length > 0) {
-      const idSet = new Set(itemIds.map(validateItemId));
+      const idSet = new Set(await getSelectedIds(session, itemIds));
       items = items.filter((i) => idSet.has(String(i.id)));
     }
 
@@ -326,24 +481,25 @@ async function adjustAllPrices(percentChange, sendProgress, itemIds) {
     let failed = 0;
 
     for (let i = 0; i < items.length; i++) {
+      await assertCurrentSession(session);
       const item = items[i];
       const currentPrice = WallapopAPI.getItemPrice(item);
       if (currentPrice <= 0) continue;
 
-      const newPrice = Math.round(currentPrice * (1 + percent / 100) * 100) / 100;
+      const newPrice = validatePrice(currentPrice * (1 + percent / 100));
 
       if (sendProgress) {
         sendProgress({ current: i + 1, total, success, failed });
       }
 
       try {
-        await WallapopAPI.updateItemPrice(session.token, session.deviceId, item.id, newPrice, session.hostname);
+        await writeItemPrice(session, item.id, newPrice);
         success++;
       } catch (err) {
         if (err.message === 'TOKEN_EXPIRED') {
-          await clearToken();
-          throw new Error(chrome.i18n.getMessage('errorTokenExpired'));
+          await handleSessionError(err, session);
         }
+        await assertCurrentSession(session);
         failed++;
       }
 
@@ -353,8 +509,10 @@ async function adjustAllPrices(percentChange, sendProgress, itemIds) {
     }
 
     const result = { total, success, failed, percent };
-    await logActivity({ type: 'prices', percent, total, success, failed });
-    await updatePriceStats(success, failed);
+    await updateForSession(session, async () => {
+      await logActivity({ type: 'prices', percent, total, success, failed });
+      await updatePriceStats(success, failed);
+    });
 
     return result;
   } finally {
@@ -363,18 +521,39 @@ async function adjustAllPrices(percentChange, sendProgress, itemIds) {
 }
 
 async function updateSingleItemPrice(itemId, newPrice) {
-  const session = await ensureUserId();
+  if (_operationInProgress) throw new Error(chrome.i18n.getMessage('errorOperationInProgress'));
   const id = validateItemId(itemId);
-  await WallapopAPI.updateItemPrice(session.token, session.deviceId, id, newPrice, session.hostname);
-  await logActivity({ type: 'price_exact', itemId: id, newPrice });
-  await updatePriceStats(1, 0);
-  return { success: true, itemId: id, newPrice };
+  const price = validatePrice(newPrice);
+  _operationInProgress = true;
+  try {
+    const session = await ensureUserId();
+    await getSelectedIds(session, [id]);
+    try {
+      await writeItemPrice(session, id, price);
+    } catch (error) {
+      await handleSessionError(error, session);
+    }
+    await updateForSession(session, async () => {
+      await logActivity({ type: 'price_exact', itemId: id, newPrice: price });
+      await updatePriceStats(1, 0);
+    });
+    return { success: true, itemId: id, newPrice: price };
+  } finally {
+    _operationInProgress = false;
+  }
 }
 
-async function clearToken() {
-  await chrome.storage.session.remove(['token', 'deviceId', 'userId']);
-  _cachedUserId = null;
-  _cachedItems = null;
+async function clearToken(expectedSession) {
+  return queueSessionUpdate(async () => {
+    if (expectedSession && !matchesSession(await readSession(), expectedSession)) return false;
+    _sessionRevision++;
+    _verifiedSession = null;
+    invalidateItems();
+    await chrome.storage.session.remove(['token', 'deviceId', 'userId']);
+    await chrome.storage.local.remove(['wallapop_item_count', 'last_republish']);
+    updateBadge(0);
+    return true;
+  });
 }
 
 // ============================================================
@@ -401,18 +580,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     case 'TOKEN_CAPTURED': {
       const token = message.token;
       const deviceId = message.deviceId;
-      if (token && typeof token === 'string' && token.length > 10) {
-        const fields = { token };
-        if (deviceId) fields.deviceId = deviceId;
-        if (message.hostname) {
-          fields.hostname = message.hostname;
-          _hostname = message.hostname;
-        }
-        setSession(fields).then(() => {
-          if (!_cachedItems) {
-            loadAllItems().catch(() => {});
-          }
-        });
+      const hostname = captureHostname(sender);
+      if (hostname && token && typeof token === 'string' && token.length > 10
+        && (deviceId == null || typeof deviceId === 'string')) {
+        captureSession(token, deviceId, hostname).then(
+          () => sendResponse({ success: true }),
+          (error) => sendResponse({ error: error.message }),
+        );
+        return true;
       }
       break;
     }
@@ -422,6 +597,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         try {
           const session = await getSession();
           const data = await chrome.storage.local.get(['wallapop_item_count', 'last_republish']);
+          await assertCurrentSession(session);
           const cooldownRemaining = Math.max(0, COOLDOWN_MS - (Date.now() - _lastRepublishStart));
           sendResponse({
             authenticated: !!session.token,
@@ -440,9 +616,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     case 'LOAD_ITEMS': {
       (async () => {
         try {
-          const items = await loadAllItems();
+          const session = await ensureUserId();
+          const items = await loadAllItems(session);
           const trackingData = await chrome.storage.local.get(['item_tracking']);
           const tracking = trackingData.item_tracking || {};
+          await assertCurrentSession(session);
 
           sendResponse({
             items: items.map((item) => {
@@ -561,8 +739,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     case 'EXPORT_CSV': {
       (async () => {
         try {
+          const session = await ensureUserId();
           let items = _cachedItems;
-          if (!items) items = await loadAllItems();
+          if (!items) items = await loadAllItems(session);
+          await assertCurrentSession(session);
           const csv = WallapopAPI.exportItemsToCSV(items);
           sendResponse({ csv });
         } catch (err) {

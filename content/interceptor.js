@@ -12,57 +12,45 @@
 (() => {
   'use strict';
 
-  let _captured = false;
+  let _capturedToken = null;
+  let _capturedDeviceId = null;
 
   function sendToken(token, deviceId) {
-    if (_captured && !deviceId) return;
-    _captured = true;
+    if (token === _capturedToken && (!deviceId || deviceId === _capturedDeviceId)) return;
+    const nextDeviceId = token === _capturedToken
+      ? (deviceId || _capturedDeviceId)
+      : (deviceId || null);
     window.postMessage({
       type: 'WT_TOKEN',
       token,
-      deviceId: deviceId || null,
+      deviceId: nextDeviceId,
     }, '*');
+    _capturedToken = token;
+    _capturedDeviceId = nextDeviceId;
+  }
+
+  function isWallapopUrl(url) {
+    return new URL(url, location.href).origin === 'https://api.wallapop.com';
   }
 
   function extractFromHeaders(headers) {
-    let token = null;
-    let deviceId = null;
-
-    if (headers instanceof Headers) {
-      const auth = headers.get('Authorization');
-      if (auth && auth.startsWith('Bearer ')) token = auth.slice(7);
-      deviceId = headers.get('DeviceID');
-    } else if (headers && typeof headers === 'object') {
-      for (const [key, value] of Object.entries(headers)) {
-        const lower = key.toLowerCase();
-        if (lower === 'authorization' && typeof value === 'string' && value.startsWith('Bearer ')) {
-          token = value.slice(7);
-        }
-        if (lower === 'deviceid') {
-          deviceId = value;
-        }
-      }
-    }
-
-    return { token, deviceId };
+    const normalized = new Headers(headers);
+    const auth = normalized.get('Authorization');
+    return {
+      token: auth?.startsWith('Bearer ') ? auth.slice(7) : null,
+      deviceId: normalized.get('DeviceID'),
+    };
   }
 
   // Patch fetch
   const originalFetch = window.fetch;
   window.fetch = function (input, init) {
     try {
-      let url = null;
-      let headers = null;
+      const url = input instanceof Request ? input.url : input;
+      let headers = init?.headers;
+      if (headers === undefined && input instanceof Request) headers = input.headers;
 
-      if (input instanceof Request) {
-        url = input.url;
-        headers = input.headers;
-      } else {
-        url = typeof input === 'string' ? input : input?.url;
-        headers = init?.headers;
-      }
-
-      if (url && url.includes('api.wallapop.com') && headers) {
+      if (isWallapopUrl(url)) {
         const { token, deviceId } = extractFromHeaders(headers);
         if (token) sendToken(token, deviceId);
       }
@@ -77,25 +65,30 @@
   const originalSetHeader = XMLHttpRequest.prototype.setRequestHeader;
 
   XMLHttpRequest.prototype.open = function (method, url) {
-    this._wtUrl = url;
-    this._wtToken = null;
-    this._wtDeviceId = null;
-    return originalOpen.apply(this, arguments);
+    const result = originalOpen.apply(this, arguments);
+    try {
+      this._wtIsWallapop = false;
+      this._wtToken = null;
+      this._wtDeviceId = null;
+      this._wtIsWallapop = isWallapopUrl(url);
+    } catch (_) {
+      // Observation must not change a successful native call.
+    }
+    return result;
   };
 
   XMLHttpRequest.prototype.setRequestHeader = function (name, value) {
-    if (this._wtUrl && this._wtUrl.includes('api.wallapop.com')) {
-      const lower = name.toLowerCase();
-      if (lower === 'authorization' && value.startsWith('Bearer ')) {
-        this._wtToken = value.slice(7);
+    const result = originalSetHeader.apply(this, arguments);
+    try {
+      if (this._wtIsWallapop) {
+        const { token, deviceId } = extractFromHeaders([[name, value]]);
+        if (token) this._wtToken = token;
+        if (deviceId) this._wtDeviceId = deviceId;
+        if (this._wtToken) sendToken(this._wtToken, this._wtDeviceId);
       }
-      if (lower === 'deviceid') {
-        this._wtDeviceId = value;
-      }
-      if (this._wtToken) {
-        sendToken(this._wtToken, this._wtDeviceId);
-      }
+    } catch (_) {
+      // Observation must not change a successful native call.
     }
-    return originalSetHeader.apply(this, arguments);
+    return result;
   };
 })();

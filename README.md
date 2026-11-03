@@ -81,6 +81,12 @@ The interceptor observes authentication headers in requests made by the signed-i
 
 Authenticated requests send the token and relevant listing data to Wallapop. The source includes no analytics or project-operated collection endpoint. Chrome clears session storage when the extension is reloaded, updated or disabled, and when the browser restarts; see the [Chrome storage documentation](https://developer.chrome.com/docs/extensions/reference/api/storage#storage_areas).
 
+Capturing new credentials clears the previous user ID and listing cache, together with the displayed listing count and last-reactivation result. Before using a newly captured session for account operations, the worker verifies the current account through the `/me` profile request. It also re-verifies after waking instead of trusting a saved user ID. Responses from an earlier session are checked before they can update the current session's state.
+
+Individual and bulk writes share an operation lock, and selected listing IDs are checked against the current account's loaded inventory. Every price-write attempt invalidates the listing cache, including failures with an uncertain server outcome; subsequent operations reload server data before using it. Session changes are checked before further requests, but requests already sent can still complete and are not cancelled or rolled back.
+
+Activity history, statistics, language and scheduling preferences remain shared across the extension installation. They are not isolated into separate per-account profiles.
+
 The manifest requests:
 
 - `storage` for session and local state;
@@ -111,7 +117,7 @@ The popup sends operation messages to the worker. The worker coordinates API cal
 
 ## Development
 
-Use **Node.js 22.12.0 or newer** for the checked-in development dependency tree, and a Chrome installation with the required Manifest V3 APIs. The lockfile's Vite version requires `^20.19.0 || >=22.12.0`; Node.js 18 does not satisfy that dependency.
+Use **Node.js 22.12+ on the 22.x line, or Node.js 24+**, for development, and a Chrome installation with the required Manifest V3 APIs. The lockfile currently resolves Vite `8.3.5`, which requires `^20.19.0 || >=22.12.0`; Node.js 18 does not satisfy that dependency.
 
 ```sh
 git clone https://github.com/Altitud-Studio-S-L-U/wallapop-tools.git
@@ -128,7 +134,7 @@ npm run test:watch
 
 After modifying source, reload the extension in `chrome://extensions/` and refresh the Wallapop tab. `npm run generate-icons` regenerates the checked-in icons using the development-only `canvas` dependency.
 
-The Vitest suite uses mocked browser and network APIs. It does not establish end-to-end behavior across Chrome's service-worker lifecycle or current live Wallapop endpoints. Verify those integration paths separately before relying on real listing operations.
+The Vitest suite includes tests that execute the real service-worker source in a Node VM with stubbed Chrome and network APIs, plus tests of the API client's session guards and the existing unit tests. These check session changes, stale responses, price-cache invalidation and operation coordination. They do not establish complete coverage or end-to-end behavior across Chrome's actual service-worker lifecycle and current live Wallapop endpoints; those paths require separate manual verification before relying on real listing operations.
 
 ## Operational limits
 
