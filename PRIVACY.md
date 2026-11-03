@@ -1,6 +1,6 @@
 # Privacy and data handling
 
-This disclosure describes Wallapop Tools 5.0.1, an independent browser extension by Altitud Studio SLU. It is not affiliated with or endorsed by Wallapop. It describes the extension's implementation, not Wallapop's or the browser vendor's data practices.
+This disclosure describes Wallapop Tools 5.0.2, an independent browser extension by Altitud Studio SLU. It is not affiliated with or endorsed by Wallapop. It describes the extension's implementation, not Wallapop's or the browser vendor's data practices.
 
 ## Data used by the extension
 
