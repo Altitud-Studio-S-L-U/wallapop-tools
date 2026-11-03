@@ -95,7 +95,7 @@ The manifest requests:
 - `declarativeNetRequest` to set Origin and Referer headers on API requests;
 - access to the API and country hosts listed above.
 
-Read the [privacy policy](https://altitudstudio.ad/en/wallapop-tools/privacy) for the project's published policy.
+Read the [privacy disclosure](PRIVACY.md) for the extension's data handling and removal controls.
 
 ## Architecture
 
@@ -134,7 +134,32 @@ npm run test:watch
 
 After modifying source, reload the extension in `chrome://extensions/` and refresh the Wallapop tab. `npm run generate-icons` regenerates the checked-in icons using the development-only `canvas` dependency.
 
-The Vitest suite includes tests that execute the real service-worker source in a Node VM with stubbed Chrome and network APIs, plus tests of the API client's session guards and the existing unit tests. These check session changes, stale responses, price-cache invalidation and operation coordination. They do not establish complete coverage or end-to-end behavior across Chrome's actual service-worker lifecycle and current live Wallapop endpoints; those paths require separate manual verification before relying on real listing operations.
+The Vitest suite includes tests that execute the real service-worker source in a Node VM with stubbed Chrome and network APIs, plus tests of the API client's session guards and the existing unit tests. These check session changes, stale responses, price-cache invalidation and operation coordination. They do not establish complete coverage or compatibility with current live Wallapop endpoints. The separate Chromium check below exercises browser integration against fixtures; real-account behavior still requires manual verification.
+
+### Isolated Chromium integration check
+
+`scripts/check-browser.mjs` loads the actual extension in a disposable Chromium profile. It exercises the popup, token interceptor and content bridge, account changes, price updates, shared operation lock, and service-worker stop/wake. All HTTP requests are fulfilled with synthetic fixtures or blocked; DNS resolution is disabled. This checks real browser integration against controlled API responses, not compatibility with live Wallapop endpoints.
+
+Supply Playwright from a separate tooling installation through `PLAYWRIGHT_MODULE_PATH`. Install its supported Chromium browser there; `CHROMIUM_EXECUTABLE` can select an existing Chromium executable. [Playwright's extension documentation](https://playwright.dev/docs/chrome-extensions) explains why its Chromium distribution is required instead of branded Chrome or Edge. Extract the release ZIP to a temporary directory, then run:
+
+```sh
+PLAYWRIGHT_MODULE_PATH=/path/to/browser-tools/node_modules/playwright \
+  node scripts/check-browser.mjs --extension /path/to/extracted-release
+```
+
+In PowerShell, set `$env:PLAYWRIGHT_MODULE_PATH` before running `node`. Playwright is optional external tooling, not a dependency of the extension or the default unit-test command. The profile is created under `.tmp` and removed when the check finishes.
+
+### Manual release packaging
+
+Use Python 3.11 or newer; the packaging script needs only the standard library:
+
+```sh
+python -m unittest discover -s tests -p test_release_package.py
+python scripts/package-release.py
+python scripts/package-release.py --verify dist/wallapop-tools-v5.0.1.zip
+```
+
+The output defaults to `dist/wallapop-tools-v<manifest-version>.zip`; use `--output /path/to/release.zip` to choose another location. The script includes only its explicit list of runtime files and the license. It excludes development dependencies, tests, Git, logs and environment files, fixes ZIP timestamps and permissions, and sorts entries. Repeated builds from the same file bytes and Python/zlib toolchain produce identical archives. Verification checks the exact file list, CRCs, manifest and byte-for-byte agreement with the checkout, then prints the archive SHA-256. Packaging does not publish a GitHub release.
 
 ## Operational limits
 
@@ -154,4 +179,4 @@ This project is not affiliated with, associated with, authorized by, or endorsed
 
 [MIT](LICENSE), copyright 2026 Altitud Studio SLU.
 
-Built by [Altitud Studio SLU](https://altitudstudio.ad), Andorra. [Website](https://altitudstudio.ad/en/wallapop-tools) · [Privacy policy](https://altitudstudio.ad/en/wallapop-tools/privacy) · [Contact](mailto:info@altitudstudio.ad).
+Built by [Altitud Studio SLU](https://altitudstudio.ad), Andorra. [Website](https://altitudstudio.ad/en/) · [Privacy disclosure](PRIVACY.md) · [Contact](mailto:info@altitudstudio.ad).
