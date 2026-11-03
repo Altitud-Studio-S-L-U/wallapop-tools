@@ -1,5 +1,5 @@
 /**
- * Popup Script - Wallapop Tools v5.0
+ * Popup Script - Wallapop Tools
  *
  * Clean, focused popup: republish, auto-republish, product list
  * with stale indicators + inline price edit, batch price adjust.
@@ -61,6 +61,7 @@
   // ===== Init =====
 
   document.addEventListener('DOMContentLoaded', async () => {
+    $('extension-version').textContent = `v${chrome.runtime.getManifest().version}`;
     const locale = await loadLanguage();
     await I18nRuntime.loadLocale(locale);
     hydrateI18n();
@@ -413,20 +414,19 @@
 
     const pct = direction < 0 ? -Math.abs(rawPct) : Math.abs(rawPct);
     const selected = getSelectedItems();
+    if (selected.length === 0) {
+      statusLabel.textContent = t('errorNoItemsSelected');
+      return;
+    }
 
     setAllButtonsDisabled(true);
     showProgress(0, 1, t('progressAdjusting'));
 
-    let resp;
-    if (selected.length > 0 && selected.length < items.length) {
-      resp = await sendMessage({
-        type: 'ADJUST_SELECTED_PRICES',
-        percent: pct,
-        itemIds: selected.map((i) => i.id),
-      });
-    } else {
-      resp = await sendMessage({ type: 'ADJUST_PRICES', percent: pct });
-    }
+    const resp = await sendMessage({
+      type: 'ADJUST_SELECTED_PRICES',
+      percent: pct,
+      itemIds: selected.map((i) => i.id),
+    });
 
     if (resp?.error) {
       hideProgress();
@@ -533,25 +533,21 @@
       }
 
       if (msg.type === 'OPERATION_COMPLETE') {
-        hideProgress();
-        let resultMsg;
-        if (msg.operation === 'republish') {
-          resultMsg = t('toastRepublished', [String(msg.success), String(msg.failed)]);
-        } else {
-          resultMsg = t('toastPricesUpdated', [String(msg.success), String(msg.failed)]);
-        }
-        statusLabel.textContent = resultMsg;
-        statusDot.className = 'status-dot connected';
-        setAllButtonsDisabled(false);
-
-        // Refresh data
-        refreshStatus();
-        loadStats();
-        loadProducts();
-        activityList.innerHTML = '';
-        loadActivityLog();
+        showOperationResult(msg);
       }
     });
+  }
+
+  async function showOperationResult(result) {
+    hideProgress();
+    await refreshStatus();
+    activityList.innerHTML = '';
+    await Promise.all([loadStats(), loadProducts(), loadActivityLog()]);
+    // Status refresh must finish before presenting the terminal result.
+    statusLabel.textContent = result.error || t(
+      result.operation === 'republish' ? 'toastRepublished' : 'toastPricesUpdated',
+      [String(result.success), String(result.failed)],
+    );
   }
 
   function showProgress(current, total, label) {

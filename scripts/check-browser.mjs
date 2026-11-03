@@ -172,6 +172,26 @@ try {
   assert.ok(requests.some((request) => request.path === '/api/v3/users/me' && request.account === 'fixture-user-a'));
   checks.push('unpacked release loads its real worker, popup, MAIN interceptor and isolated content bridge');
 
+  const writesBeforeEmptySelection = requests.filter((request) => request.method === 'PUT').length;
+  await popup.locator('#select-all').uncheck();
+  await popup.locator('#btn-raise').click();
+  await popup.waitForFunction(() => document.querySelector('#status-label').textContent === chrome.i18n.getMessage('errorNoItemsSelected'));
+  assert.equal(requests.filter((request) => request.method === 'PUT').length, writesBeforeEmptySelection);
+  assert.equal(accounts.get(tokenA).item.price.cash.amount, 100);
+  await popup.locator('#select-all').check();
+  checks.push('an empty popup selection reports an error without changing any listing');
+
+  assert.equal(await popup.locator('.footer-version').textContent(), `v${manifest.version}`);
+  checks.push('the popup displays the installed manifest version');
+
+  const extensionPeer = await context.newPage();
+  await extensionPeer.goto(popupUrl);
+  await extensionPeer.waitForFunction(() => document.querySelector('.product-title')?.textContent === 'Fixture listing A');
+  await message(extensionPeer, { type: 'OPERATION_COMPLETE', operation: 'prices', success: 0, failed: 0, error: 'Synthetic operation rejected.' });
+  await popup.waitForFunction(() => document.querySelector('#status-label').textContent === 'Synthetic operation rejected.');
+  await extensionPeer.close();
+  checks.push('terminal operation errors remain visible instead of displaying a success message');
+
   assert.equal((await bulk(popup, 10, true)).success, 1);
   assert.equal(accounts.get(tokenA).item.price.cash.amount, 110);
   assert.equal((await bulk(popup, 10, true)).success, 1);

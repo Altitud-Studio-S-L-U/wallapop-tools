@@ -1,9 +1,9 @@
 /**
- * Wallapop API Client - Pure Module (v4.0)
+ * Wallapop API client
  *
  * Imported by the service worker via importScripts().
- * All functions are pure — they receive token/deviceId as parameters.
- * No monkey-patching, no chrome.storage access, no window globals.
+ * Network functions receive token/deviceId as parameters. Data conversion
+ * helpers are independent of Chrome storage and the extension UI.
  *
  * Signature key is from Wallapop's public React bundle:
  * Base64 decode = "Now that you've found this, are you ready to join us? jobs@wallapop.com"

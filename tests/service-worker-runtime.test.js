@@ -46,6 +46,42 @@ describe('service worker runtime regressions', () => {
   });
   afterEach(() => vi.useRealTimers());
 
+  it.each([undefined, null, [], 'a-1', { length: 1 }, [null], [{}]].map((itemIds) => ({ itemIds })))('rejects invalid selected-price IDs before starting: $itemIds', async ({ itemIds }) => {
+    const { worker, api } = accountFixture();
+    const result = await worker.request({ type: 'ADJUST_SELECTED_PRICES', percent: 10, itemIds });
+    await vi.runAllTimersAsync();
+    expect(result.error).toBeTruthy();
+    expect(api.updateItemPrice).not.toHaveBeenCalled();
+    expect(worker.messages.some((message) => message.type === 'OPERATION_COMPLETE')).toBe(false);
+  });
+
+  it.each([undefined, null, [], 'a-1', { length: 1 }, [null], [{}]].map((itemIds) => ({ itemIds })))('rejects invalid selected-reactivation IDs before starting: $itemIds', async ({ itemIds }) => {
+    const { worker, api } = accountFixture();
+    const result = await worker.request({ type: 'REPUBLISH_SELECTED', itemIds });
+    await vi.runAllTimersAsync();
+    expect(result.error).toBeTruthy();
+    expect(api.republishItem).not.toHaveBeenCalled();
+    expect(worker.messages.some((message) => message.type === 'OPERATION_COMPLETE')).toBe(false);
+  });
+
+  it('adjusts only the explicitly selected listing, once, with other inventory loaded', async () => {
+    const { worker, api } = accountFixture({ itemsA: [item('a-1'), item('a-2')] });
+    const complete = worker.nextMessage((message) => message.type === 'OPERATION_COMPLETE');
+    expect(await worker.request({ type: 'ADJUST_SELECTED_PRICES', percent: 10, itemIds: ['a-2', 'a-2'] })).toEqual({ started: true });
+    await vi.runAllTimersAsync();
+    expect(await complete).toMatchObject({ total: 1, success: 1, failed: 0 });
+    expect(api.updateItemPrice.mock.calls.map((call) => [call[2], call[3]])).toEqual([['a-2', 110]]);
+  });
+
+  it('reactivates a duplicate selected listing only once', async () => {
+    const { worker, api } = accountFixture({ itemsA: [item('a-1'), item('a-2')] });
+    const complete = worker.nextMessage((message) => message.type === 'OPERATION_COMPLETE');
+    expect(await worker.request({ type: 'REPUBLISH_SELECTED', itemIds: ['a-2', 'a-2'] })).toEqual({ started: true });
+    await vi.runAllTimersAsync();
+    expect(await complete).toMatchObject({ total: 1, success: 1, failed: 0 });
+    expect(api.republishItem.mock.calls.map((call) => call[2])).toEqual(['a-2']);
+  });
+
   it('uses the latest confirmed prices for consecutive percentage adjustments: 100 → 110 → 121', async () => {
     const { worker, api } = accountFixture();
     expect((await worker.request({ type: 'LOAD_ITEMS' })).items[0].price).toBe(100);

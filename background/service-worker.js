@@ -1,5 +1,5 @@
 /**
- * Background Service Worker - Wallapop Tools v5.0
+ * Background Service Worker - Wallapop Tools
  *
  * Central hub: receives tokens from interceptor, stores in session storage,
  * executes all API calls, handles rate limiting, alarms, badge updates,
@@ -210,8 +210,18 @@ function validatePercent(value) {
 }
 
 function validateItemId(id) {
-  if (id == null || id === '') throw new Error(chrome.i18n.getMessage('errorInvalidItemId'));
+  if ((typeof id !== 'string' && typeof id !== 'number') || String(id).trim() === ''
+    || (typeof id === 'number' && !Number.isFinite(id))) {
+    throw new Error(chrome.i18n.getMessage('errorInvalidItemId'));
+  }
   return String(id);
+}
+
+function validateSelectedIds(itemIds) {
+  if (!Array.isArray(itemIds) || itemIds.length === 0) {
+    throw new Error(chrome.i18n.getMessage('errorNoItemsSelected'));
+  }
+  return [...new Set(itemIds.map(validateItemId))];
 }
 
 function validatePrice(value) {
@@ -319,7 +329,7 @@ async function loadAllItems(expectedSession) {
 }
 
 async function getSelectedIds(session, itemIds) {
-  const ids = itemIds.map(validateItemId);
+  const ids = validateSelectedIds(itemIds);
   const items = _cachedItems || await loadAllItems(session);
   await assertCurrentSession(session);
   const available = new Set(items.map((item) => String(item.id)));
@@ -471,7 +481,7 @@ async function adjustAllPrices(percentChange, sendProgress, itemIds) {
       items = await loadAllItems(session);
     }
 
-    if (itemIds && Array.isArray(itemIds) && itemIds.length > 0) {
+    if (itemIds !== undefined) {
       const idSet = new Set(await getSelectedIds(session, itemIds));
       items = items.filter((i) => idSet.has(String(i.id)));
     }
@@ -661,8 +671,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
 
     case 'REPUBLISH_SELECTED': {
-      if (!message.itemIds?.length) {
-        sendResponse({ error: chrome.i18n.getMessage('errorNoItemsSelected') });
+      let itemIds;
+      try {
+        itemIds = validateSelectedIds(message.itemIds);
+      } catch (err) {
+        sendResponse({ error: err.message });
         return true;
       }
       sendResponse({ started: true });
@@ -671,7 +684,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           const sendProgress = (progress) => {
             chrome.runtime.sendMessage({ type: 'PROGRESS', operation: 'republish', ...progress }).catch(() => {});
           };
-          const result = await republishSelected(message.itemIds, sendProgress);
+          const result = await republishSelected(itemIds, sendProgress);
           chrome.runtime.sendMessage({ type: 'OPERATION_COMPLETE', operation: 'republish', ...result }).catch(() => {});
         } catch (err) {
           chrome.runtime.sendMessage({ type: 'OPERATION_COMPLETE', operation: 'republish', success: 0, failed: 0, error: err.message }).catch(() => {});
@@ -715,8 +728,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
 
     case 'ADJUST_SELECTED_PRICES': {
+      let itemIds;
       try {
         validatePercent(message.percent);
+        itemIds = validateSelectedIds(message.itemIds);
       } catch (err) {
         sendResponse({ error: err.message });
         return true;
@@ -727,7 +742,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           const sendProgress = (progress) => {
             chrome.runtime.sendMessage({ type: 'PROGRESS', operation: 'prices', ...progress }).catch(() => {});
           };
-          const result = await adjustAllPrices(message.percent, sendProgress, message.itemIds);
+          const result = await adjustAllPrices(message.percent, sendProgress, itemIds);
           chrome.runtime.sendMessage({ type: 'OPERATION_COMPLETE', operation: 'prices', ...result }).catch(() => {});
         } catch (err) {
           chrome.runtime.sendMessage({ type: 'OPERATION_COMPLETE', operation: 'prices', success: 0, failed: 0, error: err.message }).catch(() => {});
