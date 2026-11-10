@@ -4,22 +4,13 @@
 
 A Manifest V3 browser extension by [Altitud Studio](https://altitudstudio.ad) for bulk reactivation requests, individual and batch price changes, scheduled actions and CSV export. The extension runs in the browser and calls Wallapop's web API directly, without a project-operated backend or analytics service.
 
-```text
-  Signed-in Wallapop tab
-           |
-  fetch / XHR token capture
-           |
-       content bridge
-           |
-  +-----------------------------+
-  | Background service worker   |
-  | API calls, alarms, progress |
-  | session and local storage   |
-  +-----------------------------+
-           |              ^
-           v              |
-    api.wallapop.com    Extension popup
-```
+## At a glance
+
+Select listings → adjust prices or request reactivation → review per-item results.
+
+- **For sellers:** batch actions, individual prices, scheduled reactivation and CSV export.
+- **Runs locally:** an unpacked Manifest V3 extension, with no project-operated backend or analytics service.
+- **Before you use it:** actions modify your real account. Completed writes are not rolled back when another item fails.
 
 This project is independent of Wallapop. It uses endpoints used by the web application, rather than a supported public integration API. Listing changes affect your real account and depend on Wallapop accepting each request.
 
@@ -65,109 +56,23 @@ Open the popup after connecting a session, review the loaded listings, and choos
 
 Percentage adjustments target exactly the selected listing IDs. An empty selection is rejected; it never means all listings. Duplicate IDs are processed once. The separate **reactivate all** action and scheduled reactivation still operate on all loaded listings.
 
-Operations apply requests **one item at a time**. Review the reported success and failure counts: completed writes are not rolled back if a later item fails. Exported CSV data represents the loaded listings; it is not a full account backup.
+Operations apply requests **one item at a time**. Review the reported success and failure counts: completed writes are not rolled back if a later item fails. Exported CSV data represents the loaded listings; it is not a full account backup. Formula-like text receives a leading tab for spreadsheet inspection; see the [CSV format and compatibility limits](docs/development.md#csv-format).
 
 If authentication expires, browse Wallapop again to capture a fresh token. After reloading the extension or restarting the browser, reconnect the session before relying on scheduled actions.
 
-### CSV format
-
-The export is intended for spreadsheet inspection. Every column escapes commas, double quotes and CR/LF; embedded double quotes are doubled. Numeric prices and day counts, and boolean shipping values, keep their existing serialization.
-
-Formula-like text beginning with `=`, `+`, `-` or `@` (including full-width forms and preceding whitespace/control characters), and text starting with a control character, receive exactly one leading tab inside a quoted CSV field. This follows [OWASP's Excel-oriented mitigation](https://community.owasp.org/attacks/CSV_Injection). The original text follows that tab unchanged. The tab is part of the exported data, so programmatic consumers must account for it; this CSV is not an exact text backup. Other spreadsheet programs, import settings and save/reopen workflows can interpret values differently. No universal formula-safety guarantee is implied.
-
 ## Data and permissions
 
-The interceptor observes authentication headers in requests made by the signed-in Wallapop page. A content bridge relays the token to the extension's service worker, which uses it for API calls. The API client constructs HMAC-SHA256 signatures for authenticated requests.
+The extension observes authentication headers in your signed-in Wallapop tab and relays the session to its worker for API calls. Credentials use `chrome.storage.session`; preferences, counters and local history use `chrome.storage.local`. There is no project-operated backend or analytics endpoint.
 
-| Data | Storage and use |
-| --- | --- |
-| Authentication token, device ID, user ID and host | `chrome.storage.session`; used to make requests under the captured account session. |
-| Language, scheduling preferences, counters and activity | `chrome.storage.local`; retained between browser sessions. |
-| Listing-age and last-price tracking | `chrome.storage.local`; used for local listing indicators. |
-| Loaded listing cache and operation state | Service-worker memory; not a durable work queue. |
-| CSV export | A file downloaded by the user. |
-
-Authenticated requests send the token and relevant listing data to Wallapop. The source includes no analytics or project-operated collection endpoint. Chrome clears session storage when the extension is reloaded, updated or disabled, and when the browser restarts; see the [Chrome storage documentation](https://developer.chrome.com/docs/extensions/reference/api/storage#storage_areas).
-
-Capturing new credentials clears the previous user ID and listing cache, together with the displayed listing count and last-reactivation result. Before using a newly captured session for account operations, the worker verifies the current account through the `/me` profile request. It also re-verifies after waking instead of trusting a saved user ID. Responses from an earlier session are checked before they can update the current session's state.
-
-Individual and bulk writes share an operation lock, and selected listing IDs are checked against the current account's loaded inventory. Every price-write attempt invalidates the listing cache, including failures with an uncertain server outcome; subsequent operations reload server data before using it. Session changes are checked before further requests, but requests already sent can still complete and are not cancelled or rolled back.
-
-Activity history, statistics, language and scheduling preferences remain shared across the extension installation. They are not isolated into separate per-account profiles.
-
-The manifest requests:
-
-- `storage` for session and local state;
-- `alarms` for scheduled reactivation;
-- `notifications` for scheduled-operation results;
-- `declarativeNetRequest` to set Origin and Referer headers on API requests;
-- access to the API and country hosts listed above.
-
-Read the [privacy disclosure](PRIVACY.md) for the extension's data handling and removal controls.
+Permissions cover storage, alarms, notifications, request-header rules and the configured Wallapop hosts. Activity and preferences are shared across accounts using the same extension installation. See the [data flow and account-session controls](docs/architecture.md#data-and-permissions) and [privacy disclosure](PRIVACY.md) before connecting a session.
 
 ## Architecture
 
-```text
-  wallapop-tools/
-  |-- manifest.json                 Manifest V3 permissions and entry points
-  |-- background/service-worker.js  Operations, scheduling and local history
-  |-- content/interceptor.js        Page-context fetch/XHR interception
-  |-- content/bridge.js             Page-to-extension token relay
-  |-- popup/                       Popup interface and interaction logic
-  |-- utils/wallapop-api.js          HTTP client, signing and CSV conversion
-  |-- utils/i18n-runtime.js          Translation loading and application
-  |-- _locales/                     Five translation catalogs
-  |-- tests/                        Vitest tests and browser/network mocks
-  `-- scripts/                      Icon-generation utilities
-```
-
-The popup sends operation messages to the worker. The worker coordinates API calls and reports progress. Token state is separate from persistent settings and history; API helpers receive authentication parameters from the worker.
+A page interceptor captures the session, a content bridge relays it, and the background worker coordinates API calls, scheduling and popup progress. Loaded inventory and operation locks live in worker memory; they are not a durable queue. See the [architecture and source map](docs/architecture.md#architecture).
 
 ## Development
 
-Use **Node.js 22.12+ on the 22.x line, or Node.js 24+**, for development, and a Chrome installation with the required Manifest V3 APIs. The lockfile currently resolves Vite `8.3.5`, which requires `^20.19.0 || >=22.12.0`; Node.js 18 does not satisfy that dependency.
-
-```sh
-git clone https://github.com/Altitud-Studio-S-L-U/wallapop-tools.git
-cd wallapop-tools
-npm ci
-npm test
-```
-
-For watch mode:
-
-```sh
-npm run test:watch
-```
-
-After modifying source, reload the extension in `chrome://extensions/` and refresh the Wallapop tab. `npm run generate-icons` regenerates the checked-in icons using the development-only `canvas` dependency.
-
-The Vitest suite includes tests that execute the real service-worker source in a Node VM with stubbed Chrome and network APIs, plus tests of the API client's session guards and the existing unit tests. These check session changes, stale responses, price-cache invalidation, operation coordination and selected-operation validation. Some older unit tests reproduce helper logic inline; those are examples of expected calculations, not evidence that the production implementation behaves identically. The suite does not establish complete coverage or compatibility with current live Wallapop endpoints. The separate Chromium check below exercises browser integration against fixtures; real-account behavior still requires manual verification.
-
-### Isolated Chromium integration check
-
-`scripts/check-browser.mjs` loads the actual extension in a disposable Chromium profile. It exercises the popup, empty-selection protection, visible operation errors, installed version, token interceptor and content bridge, account changes, price updates, shared operation lock, service-worker stop/wake, and downloaded CSV bytes. All HTTP requests are fulfilled with synthetic fixtures or blocked; DNS resolution is disabled. This checks real browser integration against controlled API responses, not compatibility with live Wallapop endpoints or spreadsheet applications.
-
-Supply Playwright from a separate tooling installation through `PLAYWRIGHT_MODULE_PATH`. Install its supported Chromium browser there; `CHROMIUM_EXECUTABLE` can select an existing Chromium executable. [Playwright's extension documentation](https://playwright.dev/docs/chrome-extensions) explains why its Chromium distribution is required instead of branded Chrome or Edge. Extract the release ZIP to a temporary directory, then run:
-
-```sh
-PLAYWRIGHT_MODULE_PATH=/path/to/browser-tools/node_modules/playwright \
-  node scripts/check-browser.mjs --extension /path/to/extracted-release
-```
-
-In PowerShell, set `$env:PLAYWRIGHT_MODULE_PATH` before running `node`. Playwright is optional external tooling, not a dependency of the extension or the default unit-test command. The profile is created under `.tmp` and removed when the check finishes.
-
-### Manual release packaging
-
-Use Python 3.11 or newer; the packaging script needs only the standard library:
-
-```sh
-python -m unittest discover -s tests -p test_release_package.py
-python scripts/package-release.py
-python scripts/package-release.py --verify dist/wallapop-tools-v5.0.3.zip
-```
-
-The output defaults to `dist/wallapop-tools-v<manifest-version>.zip`; use `--output /path/to/release.zip` to choose another location. The script includes only its explicit list of runtime files and the license. It excludes development dependencies, tests, Git, logs and environment files, fixes ZIP timestamps and permissions, and sorts entries. Repeated builds from the same file bytes and Python/zlib toolchain produce identical archives. Verification checks the exact file list, CRCs, manifest and byte-for-byte agreement with the checkout, then prints the archive SHA-256. Packaging does not publish a GitHub release.
+The extension runs directly from source; Node.js is needed only for development. See the [development guide](docs/development.md) for the supported Node versions, unit tests, isolated Chromium checks and reproducible ZIP packaging. The browser checks use synthetic responses; live Wallapop compatibility requires separate verification.
 
 ## Operational limits
 
